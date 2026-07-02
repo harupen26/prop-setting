@@ -12,3 +12,5 @@ expo-server.*.log
 static-server.*.log
 app-preview.png
 reference-first-drill-crop.png
+.vercel
+.env.local
