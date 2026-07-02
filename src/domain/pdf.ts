@@ -9,121 +9,85 @@ import {
   snapToCoordinate
 } from "./grid";
 import { formatMarkerLabel, getReadableTextColor } from "./labels";
-import { getActiveCompetition, getParticipantById, getRoleById, isRoleVisible } from "../selectors";
+import { getParticipantById, getRoleById, isRoleVisible } from "../selectors";
 
 const SVG_WIDTH = 520;
 const SVG_HEIGHT = 416;
 const DRILL_WIDTH = 500;
 const DRILL_HEIGHT = 400;
-const MARKER_RADIUS = 4.8;
+const MARKER_RADIUS = 4.4;
 
-export function buildPdfHtml(state: AppState): string {
-  const competition = getActiveCompetition(state);
-  const entrySvg = buildPhaseSvg(state, "entry");
-  const exitSvg = buildPhaseSvg(state, "exit");
+export type PdfTargetMode = "master" | "participant";
+export type PdfPhaseOption = "entry" | "exit" | "both";
+
+export type PdfExportOptions = {
+  targetMode: PdfTargetMode;
+  participantId?: string;
+  phaseOption: PdfPhaseOption;
+};
+
+export const defaultPdfExportOptions: PdfExportOptions = {
+  targetMode: "master",
+  phaseOption: "both"
+};
+
+export function buildPdfHtml(
+  state: AppState,
+  options: PdfExportOptions = defaultPdfExportOptions
+): string {
+  const sheets = getPdfPhases(options)
+    .map((phase) => buildSheetBlock(buildDrillSheetSvg(state, phase, options)))
+    .join("");
 
   return `<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <style>
-    @page { size: A4 portrait; margin: 18mm 14mm; }
+    @page { size: A4 landscape; margin: 6mm; }
     * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
       color: #111827;
       background: #ffffff;
     }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 10px;
-    }
-    h1 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 0;
-    }
-    .meta {
-      font-size: 10px;
-      color: #64748b;
-      text-align: right;
-      line-height: 1.6;
-    }
     .sheet {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 84px;
-      column-gap: 10px;
-      align-items: start;
-      margin-bottom: 14px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #d1d5db;
-    }
-    .sheet:last-child { border-bottom: 0; margin-bottom: 0; }
-    .phase-title {
-      font-size: 14px;
-      font-weight: 700;
-      margin: 0 0 4px 0;
-    }
-    .legend-title {
-      font-size: 9px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .legend-row {
-      display: grid;
-      grid-template-columns: 1fr 10px;
-      gap: 4px;
+      page-break-after: always;
+      height: 198mm;
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      min-height: 16px;
-      font-size: 8px;
-      line-height: 1.15;
-      margin-bottom: 3px;
-      word-break: keep-all;
+      justify-content: center;
     }
-    .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      border: 1px solid rgba(17, 24, 39, 0.18);
+    .sheet:last-child { page-break-after: auto; }
+    .drill-svg {
+      width: 247mm;
+      height: 197.6mm;
+      display: block;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>手具セット管理</h1>
-    <div class="meta">
-      <div>${escapeHtml(competition?.name ?? "大会未設定")}</div>
-      <div>${escapeHtml(new Date().toLocaleDateString("ja-JP"))}</div>
-    </div>
-  </div>
-  ${buildSheetBlock("入場", entrySvg, buildLegendHtml(state))}
-  ${buildSheetBlock("退場", exitSvg, buildLegendHtml(state))}
+  ${sheets}
 </body>
 </html>`;
 }
 
-function buildSheetBlock(title: string, svg: string, legend: string): string {
+function buildSheetBlock(svg: string): string {
   return `<section class="sheet">
-    <div>
-      <div class="phase-title">${title}</div>
-      ${svg}
-    </div>
-    <aside>
-      <div class="legend-title">【凡例】</div>
-      ${legend}
-    </aside>
+    ${svg}
   </section>`;
 }
 
-function buildPhaseSvg(state: AppState, phase: Phase): string {
-  const integratedIds = state.integratedParticipantIdsByCompetition[state.activeCompetitionId] ?? [];
-  const participantIds = integratedIds.length
-    ? integratedIds
-    : state.participants.map((participant) => participant.id);
+export function buildDrillSheetSvg(
+  state: AppState,
+  phase: Phase,
+  options: PdfExportOptions = defaultPdfExportOptions
+): string {
+  const participantIds = getPdfParticipantIds(state, options);
+  const targetLabel = getPdfTargetLabel(state, options);
   const markers = state.markers.filter(
     (marker) =>
       marker.competitionId === state.activeCompetitionId &&
@@ -137,9 +101,14 @@ function buildPhaseSvg(state: AppState, phase: Phase): string {
     .map((marker) => buildMarkerNode(state, marker, overlap[marker.id]))
     .join("");
 
-  return `<svg viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}" width="100%" height="248" role="img" aria-label="${getPhaseLabel(
+  return `<svg class="drill-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}" role="img" aria-label="${getPhaseLabel(
     phase
-  )}のドリル">
+  )}のドリル" font-family="-apple-system, BlinkMacSystemFont, Hiragino Sans, Yu Gothic, sans-serif">
+    <rect x="0" y="0" width="${SVG_WIDTH}" height="${SVG_HEIGHT}" fill="#ffffff" />
+    <text x="10" y="18" font-size="13" font-weight="700" fill="#111827">${getPhaseLabel(phase)}</text>
+    <text x="${SVG_WIDTH - 10}" y="18" text-anchor="end" font-size="10" font-weight="700" fill="#64748b">${escapeHtml(
+      targetLabel
+    )}</text>
     <text x="${DRILL_WIDTH / 2}" y="18" text-anchor="middle" font-size="18" font-weight="700">前</text>
     <g transform="translate(10, 24)">
       ${gridLines}
@@ -147,6 +116,34 @@ function buildPhaseSvg(state: AppState, phase: Phase): string {
     </g>
     <text x="${DRILL_WIDTH / 2}" y="${SVG_HEIGHT - 3}" text-anchor="middle" font-size="18" font-weight="700">後</text>
   </svg>`;
+}
+
+export function getPdfPhases(options: PdfExportOptions): Phase[] {
+  if (options.phaseOption === "entry") {
+    return ["entry"];
+  }
+
+  if (options.phaseOption === "exit") {
+    return ["exit"];
+  }
+
+  return ["entry", "exit"];
+}
+
+export function getPdfTargetLabel(state: AppState, options: PdfExportOptions): string {
+  if (options.targetMode === "participant" && options.participantId) {
+    return getParticipantById(state, options.participantId)?.name ?? "参加者";
+  }
+
+  return "統合表示";
+}
+
+function getPdfParticipantIds(state: AppState, options: PdfExportOptions): string[] {
+  if (options.targetMode === "participant" && options.participantId) {
+    return [options.participantId];
+  }
+
+  return state.participants.map((participant) => participant.id);
 }
 
 function buildGridLines(): string {
@@ -248,30 +245,38 @@ function buildMarkerNode(
   const textColor = getReadableTextColor(role.color);
   const textNodes = lines
     .map((line, index) => {
-      const dy = lines.length === 1 ? 1.5 : index === 0 ? -0.5 : 4.5;
-      return `<text x="${x}" y="${y + dy}" text-anchor="middle" font-size="4.2" font-weight="700" fill="${textColor}">${escapeHtml(
+      const { fontSize, yOffset } = getPdfMarkerTextMetrics(lines, index);
+      return `<text x="${x}" y="${y + yOffset}" text-anchor="middle" font-size="${fontSize}" font-weight="700" fill="${textColor}">${escapeHtml(
         line
       )}</text>`;
     })
     .join("");
 
   return `<g>
-    <circle cx="${x}" cy="${y}" r="${MARKER_RADIUS}" fill="${role.color}" stroke="#ffffff" stroke-width="1.2" />
+    <circle cx="${x}" cy="${y}" r="${MARKER_RADIUS}" fill="${role.color}" />
     ${textNodes}
   </g>`;
 }
 
-function buildLegendHtml(state: AppState): string {
-  return state.roles
-    .filter((role) => isRoleVisible(state, role.id))
-    .sort((a, b) => a.order - b.order)
-    .map(
-      (role) => `<div class="legend-row">
-        <span>${escapeHtml(role.name)}</span>
-        <span class="dot" style="background:${role.color}"></span>
-      </div>`
-    )
-    .join("");
+function getPdfMarkerTextMetrics(labelLines: string[], index: number) {
+  const maxLength = Math.max(...labelLines.map((line) => Array.from(line).length), 1);
+
+  if (labelLines.length === 1) {
+    if (maxLength >= 3) {
+      return { fontSize: 2.25, yOffset: 0.8 };
+    }
+
+    if (maxLength === 2) {
+      return { fontSize: 2.85, yOffset: 0.95 };
+    }
+
+    return { fontSize: 3.15, yOffset: 1.05 };
+  }
+
+  return {
+    fontSize: 2.5,
+    yOffset: index === 0 ? -0.9 : 2.2
+  };
 }
 
 function escapeHtml(value: string): string {

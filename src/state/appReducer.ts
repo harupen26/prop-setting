@@ -1,4 +1,4 @@
-import type { AppState, ApparatusRole, Competition, Marker, RoleFolder, ViewMode } from "../types";
+import type { AppState, ApparatusRole, Competition, Marker, Project, RoleFolder, ViewMode } from "../types";
 import { initialAppState } from "../data/seed";
 import { clampMarkerLabel, deriveMarkerLabelFromName } from "../domain/labels";
 
@@ -9,6 +9,7 @@ export type AppAction =
   | { type: "setViewMode"; viewMode: ViewMode }
   | { type: "setActiveParticipant"; participantId: string }
   | { type: "setSelectedRole"; roleId: string }
+  | { type: "setActiveProject"; projectId: string }
   | { type: "setActiveCompetition"; competitionId: string }
   | { type: "placeMarker"; marker: Marker }
   | { type: "moveMarker"; markerId: string; xSnap: number; ySnap: number }
@@ -18,8 +19,11 @@ export type AppAction =
   | { type: "toggleFolderCollapsed"; folderId: string }
   | { type: "addFolder"; folder: RoleFolder }
   | { type: "addRole"; role: ApparatusRole }
+  | { type: "addParticipant"; name: string }
   | { type: "updateParticipantName"; participantId: string; name: string }
   | { type: "updateParticipantLabel"; participantId: string; markerLabel: string }
+  | { type: "updateProjectName"; projectId: string; name: string }
+  | { type: "updateCompetitionName"; competitionId: string; name: string }
   | { type: "integrateParticipant"; competitionId: string; participantId: string }
   | { type: "integrateAll"; competitionId: string }
   | { type: "duplicateCompetition"; competition: Competition };
@@ -38,10 +42,39 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, activeParticipantId: action.participantId, viewMode: "participant" };
     case "setSelectedRole":
       return { ...state, selectedRoleId: action.roleId };
+    case "setActiveProject": {
+      const nextCompetition =
+        state.competitions.find((competition) => competition.projectId === action.projectId) ??
+        state.competitions[0];
+
+      return {
+        ...state,
+        activeProjectId: action.projectId,
+        activeCompetitionId: nextCompetition?.id ?? state.activeCompetitionId
+      };
+    }
     case "setActiveCompetition":
-      return { ...state, activeCompetitionId: action.competitionId };
+      return {
+        ...state,
+        activeCompetitionId: action.competitionId,
+        activeProjectId:
+          state.competitions.find((competition) => competition.id === action.competitionId)?.projectId ??
+          state.activeProjectId
+      };
     case "placeMarker":
-      return { ...state, markers: [...state.markers, action.marker] };
+      return {
+        ...state,
+        markers: [
+          ...state.markers.filter(
+            (marker) =>
+              marker.competitionId !== action.marker.competitionId ||
+              marker.participantId !== action.marker.participantId ||
+              marker.phase !== action.marker.phase ||
+              marker.roleId !== action.marker.roleId
+          ),
+          action.marker
+        ]
+      };
     case "moveMarker":
       return {
         ...state,
@@ -78,6 +111,31 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, folders: [...state.folders, action.folder] };
     case "addRole":
       return { ...state, roles: [...state.roles, action.role], selectedRoleId: action.role.id };
+    case "addParticipant": {
+      const name = action.name.trim();
+      if (!name) {
+        return state;
+      }
+
+      const id = `participant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const order = Math.max(0, ...state.participants.map((participant) => participant.order)) + 1;
+
+      return {
+        ...state,
+        activeParticipantId: id,
+        viewMode: "participant",
+        participants: [
+          ...state.participants,
+          {
+            id,
+            order,
+            name,
+            markerLabel: deriveMarkerLabelFromName(name),
+            token: createParticipantToken(id, name)
+          }
+        ]
+      };
+    }
     case "updateParticipantName":
       return {
         ...state,
@@ -89,6 +147,20 @@ export function appReducer(state: AppState, action: AppAction): AppState {
                 markerLabel: deriveMarkerLabelFromName(action.name)
               }
             : participant
+        )
+      };
+    case "updateProjectName":
+      return {
+        ...state,
+        projects: state.projects.map((project) =>
+          project.id === action.projectId ? { ...project, name: action.name } : project
+        )
+      };
+    case "updateCompetitionName":
+      return {
+        ...state,
+        competitions: state.competitions.map((competition) =>
+          competition.id === action.competitionId ? { ...competition, name: action.name } : competition
         )
       };
     case "updateParticipantLabel":
@@ -134,6 +206,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         competitions: [...state.competitions, action.competition],
+        activeProjectId: action.competition.projectId,
         activeCompetitionId: action.competition.id,
         markers: [...state.markers, ...copiedMarkers],
         integratedParticipantIdsByCompetition: {
@@ -148,14 +221,48 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 }
 
 function normalizeState(state: AppState): AppState {
+  const projects = normalizeProjects(state);
+  const activeProjectId = state.activeProjectId ?? projects[0]?.id ?? initialAppState.activeProjectId;
+  const competitions = normalizeCompetitions(state, activeProjectId);
+
   return {
     ...initialAppState,
     ...state,
-    competitions: state.competitions?.length ? state.competitions : initialAppState.competitions,
+    activeProjectId,
+    projects,
+    competitions,
     participants: state.participants?.length ? state.participants : initialAppState.participants,
     folders: state.folders?.length ? state.folders : initialAppState.folders,
     roles: state.roles?.length ? state.roles : initialAppState.roles,
     markers: state.markers ?? [],
     integratedParticipantIdsByCompetition: state.integratedParticipantIdsByCompetition ?? {}
   };
+}
+
+function normalizeProjects(state: AppState): Project[] {
+  if (state.projects?.length) {
+    return state.projects.map((project) => ({
+      ...project,
+      shareId: project.shareId || createProjectShareId(project.id)
+    }));
+  }
+
+  return initialAppState.projects;
+}
+
+function normalizeCompetitions(state: AppState, fallbackProjectId: string): Competition[] {
+  const source = state.competitions?.length ? state.competitions : initialAppState.competitions;
+
+  return source.map((competition) => ({
+    ...competition,
+    projectId: competition.projectId ?? fallbackProjectId
+  }));
+}
+
+function createProjectShareId(id: string): string {
+  return `local-${id.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "project"}`;
+}
+
+function createParticipantToken(id: string, name: string): string {
+  return `${id}-${name}`.replace(/\s+/g, "-");
 }

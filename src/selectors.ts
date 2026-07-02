@@ -1,7 +1,15 @@
-import type { AppState, ApparatusRole, Marker, Participant, RoleFolder } from "./types";
+import type { AppState, ApparatusRole, Marker, Participant, Project, RoleFolder } from "./types";
 
 export function getActiveCompetition(state: AppState) {
   return state.competitions.find((competition) => competition.id === state.activeCompetitionId);
+}
+
+export function getActiveProject(state: AppState): Project | undefined {
+  return state.projects.find((project) => project.id === state.activeProjectId);
+}
+
+export function getProjectCompetitions(state: AppState) {
+  return state.competitions.filter((competition) => competition.projectId === state.activeProjectId);
 }
 
 export function getActiveParticipant(state: AppState): Participant {
@@ -30,18 +38,16 @@ export function isRoleVisible(state: AppState, roleId: string): boolean {
 }
 
 export function getVisibleMarkers(state: AppState): Marker[] {
-  const integratedIds = state.integratedParticipantIdsByCompetition[state.activeCompetitionId] ?? [];
   const participantIds =
-    state.viewMode === "master" ? integratedIds : [state.activeParticipantId];
-  const fallbackIds = state.viewMode === "master" && participantIds.length === 0
-    ? state.participants.map((participant) => participant.id)
-    : participantIds;
+    state.viewMode === "master"
+      ? state.participants.map((participant) => participant.id)
+      : [state.activeParticipantId];
 
   return state.markers.filter(
     (marker) =>
       marker.competitionId === state.activeCompetitionId &&
       marker.phase === state.activePhase &&
-      fallbackIds.includes(marker.participantId) &&
+      participantIds.includes(marker.participantId) &&
       isRoleVisible(state, marker.roleId)
   );
 }

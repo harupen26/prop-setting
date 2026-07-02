@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 create table public.projects (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  share_id text not null unique default upper(encode(gen_random_bytes(5), 'hex')),
   created_at timestamptz not null default now()
 );
 
@@ -68,6 +69,7 @@ create table public.integrations (
 create index markers_competition_phase_idx on public.markers (competition_id, phase);
 create index markers_participant_idx on public.markers (participant_id);
 create index apparatus_roles_project_idx on public.apparatus_roles (project_id, display_order);
+create index projects_share_id_idx on public.projects (share_id);
 
 alter table public.projects enable row level security;
 alter table public.competitions enable row level security;

@@ -1,6 +1,15 @@
-import type { AppState, ApparatusRole, Marker, Participant, RoleFolder } from "../types";
+import type { AppState, ApparatusRole, Marker, Participant, Project, RoleFolder } from "../types";
 
 const now = new Date().toISOString();
+
+export const projects: Project[] = [
+  {
+    id: "project-yokohama-robins",
+    name: "YOKOHAMA ROBINS",
+    shareId: "YR-2026",
+    createdAt: now
+  }
+];
 
 export const folders: RoleFolder[] = [
   { id: "folder-m1", name: "M1", order: 1, visible: true, collapsed: false },
@@ -126,6 +135,7 @@ const seedMarkers: Marker[] = [
 ];
 
 export const initialAppState: AppState = {
+  activeProjectId: "project-yokohama-robins",
   activeCompetitionId: "competition-prefectural",
   activeParticipantId: "participant-1",
   selectedRoleId: "role-m1",
@@ -134,10 +144,12 @@ export const initialAppState: AppState = {
   competitions: [
     {
       id: "competition-prefectural",
+      projectId: "project-yokohama-robins",
       name: "県大会",
       createdAt: now
     }
   ],
+  projects,
   participants,
   folders,
   roles,

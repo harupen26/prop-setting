@@ -2,8 +2,16 @@ export type Phase = "entry" | "exit";
 
 export type ViewMode = "participant" | "master";
 
+export type Project = {
+  id: string;
+  name: string;
+  shareId: string;
+  createdAt: string;
+};
+
 export type Competition = {
   id: string;
+  projectId: string;
   name: string;
   createdAt: string;
   copiedFromCompetitionId?: string;
@@ -47,11 +55,13 @@ export type Marker = {
 };
 
 export type AppState = {
+  activeProjectId: string;
   activeCompetitionId: string;
   activeParticipantId: string;
   selectedRoleId: string;
   activePhase: Phase;
   viewMode: ViewMode;
+  projects: Project[];
   competitions: Competition[];
   participants: Participant[];
   folders: RoleFolder[];

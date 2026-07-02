@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,7 @@ import {
   SwatchBook,
   X
 } from "lucide-react-native";
+import Svg, { Rect } from "react-native-svg";
 
 import type { AppAction } from "../state/appReducer";
 import type { AppState, ApparatusRole } from "../types";
@@ -46,11 +48,24 @@ const palette = [
   "#111827"
 ];
 
+const COLOR_WHEEL_SIZE = 168;
+const COLOR_WHEEL_STEPS = 34;
+const VALUE_SLIDER_WIDTH = 30;
+const VALUE_SLIDER_STEPS = 28;
+
+type HsvColor = {
+  hue: number;
+  saturation: number;
+  value: number;
+};
+
 export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
   const selectedRole = getSelectedRole(state);
   const [newFolderName, setNewFolderName] = useState("");
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleColor, setNewRoleColor] = useState(palette[0]);
+  const [newRoleHsv, setNewRoleHsv] = useState<HsvColor>(hexToHsv(palette[0]));
+  const [customColorOpen, setCustomColorOpen] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState(state.folders[0]?.id ?? "");
 
   const rolesByFolder = useMemo(() => {
@@ -102,6 +117,16 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
       }
     });
     setNewRoleName("");
+  }
+
+  function selectColor(color: string) {
+    setNewRoleColor(color);
+    setNewRoleHsv(hexToHsv(color));
+  }
+
+  function selectHsvColor(color: HsvColor) {
+    setNewRoleHsv(color);
+    setNewRoleColor(hsvToHex(color));
   }
 
   function selectRole(roleId: string) {
@@ -228,7 +253,7 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
                   <Pressable
                     key={item}
                     accessibilityLabel={`${item}を選択`}
-                    onPress={() => setNewRoleColor(item)}
+                    onPress={() => selectColor(item)}
                     style={[
                       styles.paletteSwatch,
                       { backgroundColor: item },
@@ -236,7 +261,27 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
                     ]}
                   />
                 ))}
+                <Pressable
+                  accessibilityLabel="自由色を選択"
+                  onPress={() => {
+                    setCustomColorOpen((value) => !value);
+                  }}
+                  style={[
+                    styles.paletteSwatch,
+                    styles.paletteAddButton,
+                    !palette.includes(newRoleColor) && styles.paletteSwatchActive
+                  ]}
+                >
+                  <Plus size={18} color={colors.text} />
+                </Pressable>
               </ScrollView>
+              {customColorOpen ? (
+                <ColorWheelPicker
+                  hsv={newRoleHsv}
+                  selectedColor={newRoleColor}
+                  onChange={selectHsvColor}
+                />
+              ) : null}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.folderChips}>
                 {state.folders.map((folderItem) => (
                   <Pressable
@@ -435,6 +480,80 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.text
   },
+  paletteAddButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderStyle: "dashed"
+  },
+  colorPickerPanel: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: 10,
+    backgroundColor: colors.surfaceSoft,
+    gap: 10
+  },
+  colorPickerRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center"
+  },
+  colorWheel: {
+    width: COLOR_WHEEL_SIZE,
+    height: COLOR_WHEEL_SIZE,
+    borderRadius: COLOR_WHEEL_SIZE / 2,
+    overflow: "hidden",
+    backgroundColor: colors.surface
+  },
+  colorWheelCursor: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#ffffff",
+    shadowColor: "#111827",
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2
+  },
+  valueSlider: {
+    width: VALUE_SLIDER_WIDTH,
+    height: COLOR_WHEEL_SIZE,
+    borderRadius: 15,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(17, 24, 39, 0.14)"
+  },
+  valueSliderCursor: {
+    position: "absolute",
+    left: -4,
+    width: VALUE_SLIDER_WIDTH + 8,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#ffffff",
+    backgroundColor: "rgba(17, 24, 39, 0.12)"
+  },
+  selectedColorLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  selectedColorPreview: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(17, 24, 39, 0.14)"
+  },
+  selectedColorText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
   folderChips: {
     gap: 8
   },
@@ -472,3 +591,231 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   }
 });
+
+function ColorWheelPicker({
+  hsv,
+  selectedColor,
+  onChange
+}: {
+  hsv: HsvColor;
+  selectedColor: string;
+  onChange: (color: HsvColor) => void;
+}) {
+  const wheelCells = useMemo(() => buildColorWheelCells(hsv.value), [hsv.value]);
+  const sliderCells = useMemo(() => buildValueSliderCells(hsv), [hsv]);
+  const center = COLOR_WHEEL_SIZE / 2;
+  const wheelRadius = COLOR_WHEEL_SIZE / 2;
+  const cursorRadius = hsv.saturation * wheelRadius;
+  const cursorX = center + Math.cos((hsv.hue * Math.PI) / 180) * cursorRadius;
+  const cursorY = center + Math.sin((hsv.hue * Math.PI) / 180) * cursorRadius;
+  const sliderY = (1 - hsv.value) * COLOR_WHEEL_SIZE;
+
+  const wheelResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          const { locationX, locationY } = event.nativeEvent;
+          onChange(pointToHsv(locationX, locationY, hsv.value));
+        },
+        onPanResponderMove: (event) => {
+          const { locationX, locationY } = event.nativeEvent;
+          onChange(pointToHsv(locationX, locationY, hsv.value));
+        }
+      }),
+    [hsv.value, onChange]
+  ).panHandlers;
+
+  const sliderResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          onChange({ ...hsv, value: sliderPointToValue(event.nativeEvent.locationY) });
+        },
+        onPanResponderMove: (event) => {
+          onChange({ ...hsv, value: sliderPointToValue(event.nativeEvent.locationY) });
+        }
+      }),
+    [hsv, onChange]
+  ).panHandlers;
+
+  return (
+    <View style={styles.colorPickerPanel}>
+      <View style={styles.colorPickerRow}>
+        <View {...wheelResponder} style={styles.colorWheel}>
+          <Svg width={COLOR_WHEEL_SIZE} height={COLOR_WHEEL_SIZE}>
+            {wheelCells}
+          </Svg>
+          <View
+            pointerEvents="none"
+            style={[
+              styles.colorWheelCursor,
+              {
+                backgroundColor: selectedColor,
+                left: cursorX - 8,
+                top: cursorY - 8
+              }
+            ]}
+          />
+        </View>
+        <View {...sliderResponder} style={styles.valueSlider}>
+          <Svg width={VALUE_SLIDER_WIDTH} height={COLOR_WHEEL_SIZE}>
+            {sliderCells}
+          </Svg>
+          <View pointerEvents="none" style={[styles.valueSliderCursor, { top: sliderY - 5 }]} />
+        </View>
+      </View>
+      <View style={styles.selectedColorLine}>
+        <View style={[styles.selectedColorPreview, { backgroundColor: selectedColor }]} />
+        <Text style={styles.selectedColorText}>選択中の色</Text>
+      </View>
+    </View>
+  );
+}
+
+function buildColorWheelCells(value: number) {
+  const cells = [];
+  const cell = COLOR_WHEEL_SIZE / COLOR_WHEEL_STEPS;
+  const center = COLOR_WHEEL_SIZE / 2;
+  const radius = COLOR_WHEEL_SIZE / 2;
+
+  for (let row = 0; row < COLOR_WHEEL_STEPS; row += 1) {
+    for (let col = 0; col < COLOR_WHEEL_STEPS; col += 1) {
+      const x = col * cell;
+      const y = row * cell;
+      const dx = x + cell / 2 - center;
+      const dy = y + cell / 2 - center;
+      const distance = Math.hypot(dx, dy);
+
+      if (distance > radius) {
+        continue;
+      }
+
+      const hue = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+      const saturation = Math.min(1, distance / radius);
+      cells.push(
+        <Rect
+          key={`${row}-${col}`}
+          x={x}
+          y={y}
+          width={cell + 0.5}
+          height={cell + 0.5}
+          fill={hsvToHex({ hue, saturation, value })}
+        />
+      );
+    }
+  }
+
+  return cells;
+}
+
+function buildValueSliderCells(hsv: HsvColor) {
+  const cells = [];
+  const cellHeight = COLOR_WHEEL_SIZE / VALUE_SLIDER_STEPS;
+
+  for (let index = 0; index < VALUE_SLIDER_STEPS; index += 1) {
+    const value = 1 - index / (VALUE_SLIDER_STEPS - 1);
+    cells.push(
+      <Rect
+        key={index}
+        x={0}
+        y={index * cellHeight}
+        width={VALUE_SLIDER_WIDTH}
+        height={cellHeight + 0.5}
+        fill={hsvToHex({ ...hsv, value })}
+      />
+    );
+  }
+
+  return cells;
+}
+
+function pointToHsv(x: number, y: number, value: number): HsvColor {
+  const center = COLOR_WHEEL_SIZE / 2;
+  const radius = COLOR_WHEEL_SIZE / 2;
+  const dx = x - center;
+  const dy = y - center;
+  const distance = Math.min(radius, Math.hypot(dx, dy));
+
+  return {
+    hue: ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360,
+    saturation: distance / radius,
+    value
+  };
+}
+
+function sliderPointToValue(y: number): number {
+  return 1 - clamp(y / COLOR_WHEEL_SIZE, 0, 1);
+}
+
+function hsvToHex({ hue, saturation, value }: HsvColor): string {
+  const chroma = value * saturation;
+  const huePrime = hue / 60;
+  const x = chroma * (1 - Math.abs((huePrime % 2) - 1));
+  const match = value - chroma;
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+
+  if (huePrime >= 0 && huePrime < 1) {
+    red = chroma;
+    green = x;
+  } else if (huePrime >= 1 && huePrime < 2) {
+    red = x;
+    green = chroma;
+  } else if (huePrime >= 2 && huePrime < 3) {
+    green = chroma;
+    blue = x;
+  } else if (huePrime >= 3 && huePrime < 4) {
+    green = x;
+    blue = chroma;
+  } else if (huePrime >= 4 && huePrime < 5) {
+    red = x;
+    blue = chroma;
+  } else {
+    red = chroma;
+    blue = x;
+  }
+
+  return `#${toHexByte((red + match) * 255)}${toHexByte((green + match) * 255)}${toHexByte(
+    (blue + match) * 255
+  )}`;
+}
+
+function hexToHsv(hex: string): HsvColor {
+  const clean = hex.replace("#", "");
+  const red = Number.parseInt(clean.slice(0, 2), 16) / 255;
+  const green = Number.parseInt(clean.slice(2, 4), 16) / 255;
+  const blue = Number.parseInt(clean.slice(4, 6), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  let hue = 0;
+
+  if (delta !== 0) {
+    if (max === red) {
+      hue = 60 * (((green - blue) / delta) % 6);
+    } else if (max === green) {
+      hue = 60 * ((blue - red) / delta + 2);
+    } else {
+      hue = 60 * ((red - green) / delta + 4);
+    }
+  }
+
+  return {
+    hue: (hue + 360) % 360,
+    saturation: max === 0 ? 0 : delta / max,
+    value: max
+  };
+}
+
+function toHexByte(value: number): string {
+  return Math.round(clamp(value, 0, 255)).toString(16).padStart(2, "0");
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}

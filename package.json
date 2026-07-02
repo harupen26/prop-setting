@@ -9,16 +9,20 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "export:web": "expo export --platform web",
+    "preview:pwa": "expo export --platform web && python -m http.server 8080 --directory dist"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.108.2",
     "expo": "~56.0.12",
+    "expo-clipboard": "~56.0.4",
     "expo-file-system": "~56.0.8",
     "expo-print": "~56.0.4",
     "expo-sharing": "~56.0.18",
     "expo-status-bar": "~56.0.4",
+    "jspdf": "^4.2.1",
     "lucide-react-native": "^1.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",

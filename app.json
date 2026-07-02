@@ -4,19 +4,38 @@
     "slug": "yokohama-robina",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "propsetting",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "buildNumber": "1",
+      "bundleIdentifier": "com.yokohamarobins.propsetting",
       "supportsTablet": true
     },
     "android": {
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.yokohamarobins.propsetting",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "手具セット管理",
+      "shortName": "手具セット",
+      "lang": "ja",
+      "themeColor": "#111827",
+      "backgroundColor": "#ffffff",
+      "description": "YOKOHAMA ROBINSの手具セットとドリルシートを管理するPWAです。"
     }
   }
 }
