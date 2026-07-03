@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { type Dispatch, type ReactNode, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -9,9 +9,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import * as Clipboard from "expo-clipboard";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import {
@@ -19,8 +21,11 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Copy,
   Eye,
   FileDown,
+  LogIn,
+  Plus,
   Settings,
   Trash2,
   Users
@@ -39,6 +44,7 @@ import {
   type PdfTargetMode
 } from "./src/domain/pdf";
 import { SNAP, clamp } from "./src/domain/grid";
+import type { AppAction } from "./src/state/appReducer";
 import { usePersistentState } from "./src/state/usePersistentState";
 import { colors, radius } from "./src/theme";
 import type { AppState, Phase, ViewMode } from "./src/types";
@@ -165,7 +171,7 @@ export default function App() {
   }
 
   if (projectListOpen) {
-    return <ProjectListScreen state={state} onOpenProject={openProject} />;
+    return <ProjectListScreen state={state} dispatch={dispatch} onOpenProject={openProject} />;
   }
 
   return (
@@ -393,11 +399,117 @@ export default function App() {
 
 function ProjectListScreen({
   state,
+  dispatch,
   onOpenProject
 }: {
   state: AppState;
+  dispatch: Dispatch<AppAction>;
   onOpenProject: (projectId: string) => void;
 }) {
+  const [actionOpen, setActionOpen] = useState(false);
+  const [actionMode, setActionMode] = useState<"create" | "join">("create");
+  const [projectName, setProjectName] = useState("");
+  const [createInviteId, setCreateInviteId] = useState(() => generateInviteId(""));
+  const [joinInviteId, setJoinInviteId] = useState("");
+
+  function openProjectAction() {
+    setActionMode("create");
+    setProjectName("");
+    setCreateInviteId(generateInviteId(""));
+    setJoinInviteId("");
+    setActionOpen(true);
+  }
+
+  function isDuplicateInviteId(inviteId: string) {
+    return state.projects.some((project) => project.shareId.toLowerCase() === inviteId.toLowerCase());
+  }
+
+  async function copyCreateInviteId() {
+    if (!isInviteIdValid(createInviteId)) {
+      Alert.alert("招待IDを確認してください", INVITE_ID_HELP);
+      return;
+    }
+
+    await Clipboard.setStringAsync(createInviteId);
+    Alert.alert("招待IDをコピーしました", createInviteId);
+  }
+
+  function createProject() {
+    const name = projectName.trim();
+    const shareId = createInviteId.trim();
+    if (!name) {
+      Alert.alert("プロジェクト名を入力してください");
+      return;
+    }
+    if (!isInviteIdValid(shareId)) {
+      Alert.alert("招待IDを確認してください", INVITE_ID_HELP);
+      return;
+    }
+    if (isDuplicateInviteId(shareId)) {
+      Alert.alert("この招待IDはすでに使われています", "別の招待IDを設定してください。");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const projectId = `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const competitionId = `competition-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    dispatch({
+      type: "createProject",
+      project: {
+        id: projectId,
+        name,
+        shareId,
+        createdAt: now
+      },
+      competition: {
+        id: competitionId,
+        projectId,
+        name: "県大会",
+        createdAt: now
+      }
+    });
+    setActionOpen(false);
+    onOpenProject(projectId);
+  }
+
+  function joinProject() {
+    const shareId = joinInviteId.trim();
+    if (!isInviteIdValid(shareId)) {
+      Alert.alert("招待IDを確認してください", INVITE_ID_HELP);
+      return;
+    }
+
+    const existingProject = state.projects.find(
+      (project) => project.shareId.toLowerCase() === shareId.toLowerCase()
+    );
+    if (existingProject) {
+      setActionOpen(false);
+      onOpenProject(existingProject.id);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const projectId = `project-joined-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const competitionId = `competition-joined-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    dispatch({
+      type: "joinProject",
+      project: {
+        id: projectId,
+        name: `参加プロジェクト ${shareId}`,
+        shareId,
+        createdAt: now
+      },
+      competition: {
+        id: competitionId,
+        projectId,
+        name: "共有シート",
+        createdAt: now
+      }
+    });
+    setActionOpen(false);
+    onOpenProject(projectId);
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
@@ -436,8 +548,121 @@ function ProjectListScreen({
           })}
         </View>
       </ScrollView>
+      <Pressable accessibilityLabel="プロジェクトを追加" style={styles.projectFab} onPress={openProjectAction}>
+        <Plus size={24} color="#ffffff" />
+      </Pressable>
+
+      <Modal visible={actionOpen} transparent animationType="fade" onRequestClose={() => setActionOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setActionOpen(false)} />
+          <View style={styles.projectActionPanel}>
+            <View style={styles.projectActionHeader}>
+              <Text style={styles.projectActionTitle}>プロジェクトを追加</Text>
+              <Text style={styles.projectActionSubtitle}>作成するか、招待IDで参加します。</Text>
+            </View>
+
+            <SegmentedControl<"create" | "join">
+              value={actionMode}
+              options={[
+                { value: "create", label: "作成" },
+                { value: "join", label: "参加" }
+              ]}
+              onChange={setActionMode}
+            />
+
+            {actionMode === "create" ? (
+              <View style={styles.projectActionSection}>
+                <Text style={styles.projectActionLabel}>プロジェクト名</Text>
+                <TextInput
+                  value={projectName}
+                  onChangeText={setProjectName}
+                  placeholder="例: YOKOHAMA ROBINS 2026"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.projectActionInput}
+                />
+                <Text style={styles.projectActionLabel}>招待ID</Text>
+                <View style={styles.inviteInputRow}>
+                  <TextInput
+                    value={createInviteId}
+                    onChangeText={(value) => setCreateInviteId(formatInviteIdInput(value))}
+                    placeholder="YR-2026"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    style={[styles.projectActionInput, styles.inviteInput]}
+                  />
+                  <Pressable
+                    accessibilityLabel="招待IDを自動作成"
+                    style={styles.projectSmallButton}
+                    onPress={() => setCreateInviteId(generateInviteId(projectName))}
+                  >
+                    <Text style={styles.projectSmallButtonText}>自動</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="招待IDをコピー"
+                    style={styles.projectIconButton}
+                    onPress={copyCreateInviteId}
+                  >
+                    <Copy size={17} color={colors.text} />
+                  </Pressable>
+                </View>
+                <Text style={styles.projectActionHelp}>{INVITE_ID_HELP}</Text>
+                <View style={styles.projectActionButtons}>
+                  <Pressable style={styles.projectCancelButton} onPress={() => setActionOpen(false)}>
+                    <Text style={styles.projectCancelText}>キャンセル</Text>
+                  </Pressable>
+                  <Pressable style={styles.projectPrimaryButton} onPress={createProject}>
+                    <Plus size={17} color="#ffffff" />
+                    <Text style={styles.projectPrimaryText}>作成</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.projectActionSection}>
+                <Text style={styles.projectActionLabel}>招待ID</Text>
+                <TextInput
+                  value={joinInviteId}
+                  onChangeText={(value) => setJoinInviteId(formatInviteIdInput(value))}
+                  placeholder="招待IDを入力"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  style={styles.projectActionInput}
+                />
+                <Text style={styles.projectActionHelp}>{INVITE_ID_HELP}</Text>
+                <View style={styles.projectActionButtons}>
+                  <Pressable style={styles.projectCancelButton} onPress={() => setActionOpen(false)}>
+                    <Text style={styles.projectCancelText}>キャンセル</Text>
+                  </Pressable>
+                  <Pressable style={styles.projectPrimaryButton} onPress={joinProject}>
+                    <LogIn size={17} color="#ffffff" />
+                    <Text style={styles.projectPrimaryText}>参加</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
+}
+
+const INVITE_ID_HELP = "使える文字: 半角英数字・ハイフン(-)・アンダーバー(_) / 3〜24文字";
+const INVITE_ID_PATTERN = /^[A-Z0-9_-]{3,24}$/;
+
+function formatInviteIdInput(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase().slice(0, 24);
+}
+
+function isInviteIdValid(value: string): boolean {
+  return INVITE_ID_PATTERN.test(value);
+}
+
+function generateInviteId(seed: string): string {
+  const base = formatInviteIdInput(seed).replace(/^[-_]+|[-_]+$/g, "").slice(0, 12) || "PROJECT";
+  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${base}-${suffix}`.slice(0, 24);
 }
 
 function normalizePdfOptions(options: PdfExportOptions, fallbackParticipantId: string): PdfExportOptions {
@@ -701,6 +926,133 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     backgroundColor: colors.surfaceSoft
+  },
+  projectFab: {
+    position: "absolute",
+    right: 18,
+    bottom: 22,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary
+  },
+  projectActionPanel: {
+    width: "100%",
+    maxWidth: 460,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    gap: 16,
+    backgroundColor: colors.surface
+  },
+  projectActionHeader: {
+    gap: 4
+  },
+  projectActionTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  projectActionSubtitle: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  projectActionSection: {
+    gap: 9
+  },
+  projectActionLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  projectActionInput: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "800",
+    backgroundColor: colors.surface
+  },
+  inviteInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  inviteInput: {
+    flex: 1
+  },
+  projectSmallButton: {
+    minHeight: 42,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface
+  },
+  projectSmallButtonText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  projectIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface
+  },
+  projectActionHelp: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "700"
+  },
+  projectActionButtons: {
+    marginTop: 4,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  projectCancelButton: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  projectCancelText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  projectPrimaryButton: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.primary
+  },
+  projectPrimaryText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900"
   },
   header: {
     minHeight: 68,

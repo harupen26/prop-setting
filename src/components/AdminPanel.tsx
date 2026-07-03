@@ -20,6 +20,7 @@ import {
   Plus,
   RotateCcw,
   SquareStack,
+  Trash2,
   Users
 } from "lucide-react-native";
 
@@ -82,6 +83,39 @@ export function ProjectSettingsPanel({
 
     dispatch({ type: "duplicateCompetition", competition });
     setDuplicateName("");
+  }
+
+  function confirmDeleteCompetition(competition: Competition) {
+    if (!competition.copiedFromCompetitionId) {
+      Alert.alert("元シートは削除できません", "更新版としてコピー作成したシートだけ削除できます。");
+      return;
+    }
+
+    Alert.alert(
+      "更新版シートを削除しますか？",
+      `「${competition.name}」にある丸の配置も削除対象になります。`,
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: "次へ",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "本当に削除しますか？",
+              "データは完全に失われます。この操作は元に戻せません。",
+              [
+                { text: "キャンセル", style: "cancel" },
+                {
+                  text: "完全に削除",
+                  style: "destructive",
+                  onPress: () => dispatch({ type: "deleteCompetition", competitionId: competition.id })
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
   }
 
   function resetData() {
@@ -148,10 +182,20 @@ export function ProjectSettingsPanel({
                       placeholderTextColor={colors.textMuted}
                       style={[styles.input, styles.sheetNameInput]}
                     />
+                    {competition.copiedFromCompetitionId ? (
+                      <Pressable
+                        accessibilityLabel={`${competition.name}を削除`}
+                        style={styles.sheetDeleteButton}
+                        onPress={() => confirmDeleteCompetition(competition)}
+                      >
+                        <Trash2 size={16} color={colors.danger} />
+                      </Pressable>
+                    ) : null}
                   </View>
                 );
               })}
             </View>
+            <Text style={styles.helpText}>元シートは残し、コピー作成した更新版シートだけ削除できます。</Text>
 
             <View style={styles.inlineForm}>
               <TextInput
@@ -464,6 +508,16 @@ const styles = StyleSheet.create({
   },
   sheetNameInput: {
     flex: 1
+  },
+  sheetDeleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface
   },
   inlineForm: {
     flexDirection: "row",

@@ -26,7 +26,10 @@ export type AppAction =
   | { type: "updateCompetitionName"; competitionId: string; name: string }
   | { type: "integrateParticipant"; competitionId: string; participantId: string }
   | { type: "integrateAll"; competitionId: string }
-  | { type: "duplicateCompetition"; competition: Competition };
+  | { type: "duplicateCompetition"; competition: Competition }
+  | { type: "deleteCompetition"; competitionId: string }
+  | { type: "createProject"; project: Project; competition: Competition }
+  | { type: "joinProject"; project: Project; competition: Competition };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
@@ -215,9 +218,74 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         }
       };
     }
+    case "deleteCompetition": {
+      const target = state.competitions.find((competition) => competition.id === action.competitionId);
+      if (!target?.copiedFromCompetitionId) {
+        return state;
+      }
+
+      const projectCompetitions = state.competitions.filter(
+        (competition) => competition.projectId === target.projectId
+      );
+      if (projectCompetitions.length <= 1) {
+        return state;
+      }
+
+      const competitions = state.competitions.filter((competition) => competition.id !== target.id);
+      const nextCompetition =
+        state.activeCompetitionId === target.id
+          ? competitions.find((competition) => competition.projectId === target.projectId) ?? competitions[0]
+          : state.competitions.find((competition) => competition.id === state.activeCompetitionId);
+      const { [target.id]: _deletedIntegratedIds, ...integratedParticipantIdsByCompetition } =
+        state.integratedParticipantIdsByCompetition;
+
+      return {
+        ...state,
+        activeCompetitionId: nextCompetition?.id ?? state.activeCompetitionId,
+        activeProjectId: nextCompetition?.projectId ?? state.activeProjectId,
+        competitions,
+        markers: state.markers.filter((marker) => marker.competitionId !== target.id),
+        integratedParticipantIdsByCompetition
+      };
+    }
+    case "createProject":
+    case "joinProject":
+      return addProject(state, action.project, action.competition);
     default:
       return state;
   }
+}
+
+function addProject(state: AppState, project: Project, competition: Competition): AppState {
+  const shareIdTaken = state.projects.some(
+    (item) => item.shareId.toLowerCase() === project.shareId.toLowerCase()
+  );
+  if (shareIdTaken) {
+    const existingProject = state.projects.find(
+      (item) => item.shareId.toLowerCase() === project.shareId.toLowerCase()
+    );
+    const existingCompetition =
+      state.competitions.find((item) => item.projectId === existingProject?.id) ?? state.competitions[0];
+
+    return {
+      ...state,
+      activeProjectId: existingProject?.id ?? state.activeProjectId,
+      activeCompetitionId: existingCompetition?.id ?? state.activeCompetitionId
+    };
+  }
+
+  return {
+    ...state,
+    activeProjectId: project.id,
+    activeCompetitionId: competition.id,
+    viewMode: "participant",
+    projects: [...state.projects, project],
+    competitions: [...state.competitions, competition],
+    integratedParticipantIdsByCompetition: {
+      ...state.integratedParticipantIdsByCompetition,
+      [competition.id]: [state.activeParticipantId]
+    }
+  };
 }
 
 function normalizeState(state: AppState): AppState {

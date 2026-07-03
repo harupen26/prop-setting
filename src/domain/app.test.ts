@@ -6,7 +6,7 @@ import { replaceParticipantMarkers } from "./merge";
 import { initialAppState } from "../data/seed";
 import { getVisibleMarkers } from "../selectors";
 import { appReducer } from "../state/appReducer";
-import type { Marker } from "../types";
+import type { Competition, Marker, Project } from "../types";
 
 describe("座標吸着", () => {
   it("キャンバス座標を0.3125m単位のスナップ座標へ変換する", () => {
@@ -130,6 +130,67 @@ describe("統合", () => {
     expect(result.competitions.find((competition) => competition.id === "competition-kanto")?.name).toBe("関東大会");
     expect(result.markers.some((marker) => marker.competitionId === "competition-kanto")).toBe(true);
   });
+
+  it("更新版シートを削除すると丸と統合設定も消える", () => {
+    const duplicated = appReducer(initialAppState, {
+      type: "duplicateCompetition",
+      competition: competition("competition-kanto", initialAppState.activeProjectId, "関東大会", {
+        copiedFromCompetitionId: initialAppState.activeCompetitionId
+      })
+    });
+
+    const result = appReducer(duplicated, { type: "deleteCompetition", competitionId: "competition-kanto" });
+
+    expect(result.activeCompetitionId).toBe(initialAppState.activeCompetitionId);
+    expect(result.competitions.some((item) => item.id === "competition-kanto")).toBe(false);
+    expect(result.markers.some((item) => item.competitionId === "competition-kanto")).toBe(false);
+    expect(result.integratedParticipantIdsByCompetition["competition-kanto"]).toBeUndefined();
+  });
+
+  it("元シートは削除しない", () => {
+    const result = appReducer(initialAppState, {
+      type: "deleteCompetition",
+      competitionId: initialAppState.activeCompetitionId
+    });
+
+    expect(result.competitions.some((competition) => competition.id === initialAppState.activeCompetitionId)).toBe(true);
+  });
+
+  it("プロジェクトを作成すると最初のシートも作成して開く", () => {
+    const result = appReducer(initialAppState, {
+      type: "createProject",
+      project: project("project-new", "新規プロジェクト", "NEW-2026"),
+      competition: competition("competition-new", "project-new", "県大会")
+    });
+
+    expect(result.activeProjectId).toBe("project-new");
+    expect(result.activeCompetitionId).toBe("competition-new");
+    expect(result.projects.some((item) => item.shareId === "NEW-2026")).toBe(true);
+    expect(result.competitions.some((item) => item.projectId === "project-new")).toBe(true);
+  });
+
+  it("招待IDで参加すると自分のプロジェクト一覧に追加して開く", () => {
+    const result = appReducer(initialAppState, {
+      type: "joinProject",
+      project: project("project-joined", "参加プロジェクト ABC-123", "ABC-123"),
+      competition: competition("competition-joined", "project-joined", "共有シート")
+    });
+
+    expect(result.activeProjectId).toBe("project-joined");
+    expect(result.activeCompetitionId).toBe("competition-joined");
+    expect(result.projects.find((item) => item.id === "project-joined")?.shareId).toBe("ABC-123");
+  });
+
+  it("同じ招待IDで参加した場合は既存プロジェクトを開く", () => {
+    const result = appReducer(initialAppState, {
+      type: "joinProject",
+      project: project("project-duplicate", "重複プロジェクト", initialAppState.projects[0].shareId),
+      competition: competition("competition-duplicate", "project-duplicate", "共有シート")
+    });
+
+    expect(result.activeProjectId).toBe(initialAppState.activeProjectId);
+    expect(result.projects.some((item) => item.id === "project-duplicate")).toBe(false);
+  });
 });
 
 function marker(id: string, participantId: string, xSnap: number): Marker {
@@ -142,5 +203,29 @@ function marker(id: string, participantId: string, xSnap: number): Marker {
     xSnap,
     ySnap: 10,
     updatedAt: "2026-06-30T00:00:00.000Z"
+  };
+}
+
+function project(id: string, name: string, shareId: string): Project {
+  return {
+    id,
+    name,
+    shareId,
+    createdAt: "2026-07-03T00:00:00.000Z"
+  };
+}
+
+function competition(
+  id: string,
+  projectId: string,
+  name: string,
+  overrides: Partial<Competition> = {}
+): Competition {
+  return {
+    id,
+    projectId,
+    name,
+    createdAt: "2026-07-03T00:00:00.000Z",
+    ...overrides
   };
 }
