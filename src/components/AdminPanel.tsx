@@ -234,6 +234,8 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
   const activeParticipant = getActiveParticipant(state);
   const integratedIds = state.integratedParticipantIdsByCompetition[state.activeCompetitionId] ?? [];
   const [newParticipantName, setNewParticipantName] = useState("");
+  const [deleteCandidate, setDeleteCandidate] = useState<Participant | undefined>();
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const shareId = activeProject?.shareId ?? "未発行";
   const inviteLink = `propsetting://project/${shareId}`;
 
@@ -248,37 +250,28 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
     setNewParticipantName("");
   }
 
-  function confirmDeleteParticipant(participant: Participant) {
+  function openDeleteParticipant(participant: Participant) {
     if (state.participants.length <= 1) {
       Alert.alert("最後の参加者は削除できません", "少なくとも1人の参加者が必要です。");
       return;
     }
 
-    Alert.alert(
-      "参加者を削除しますか？",
-      `「${participant.name}」の全シートの丸配置も削除対象になります。`,
-      [
-        { text: "キャンセル", style: "cancel" },
-        {
-          text: "次へ",
-          style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              "本当に削除しますか？",
-              "データは完全に失われます。この操作は元に戻せません。",
-              [
-                { text: "キャンセル", style: "cancel" },
-                {
-                  text: "完全に削除",
-                  style: "destructive",
-                  onPress: () => dispatch({ type: "deleteParticipant", participantId: participant.id })
-                }
-              ]
-            );
-          }
-        }
-      ]
-    );
+    setDeleteCandidate(participant);
+    setDeleteStep(1);
+  }
+
+  function closeDeleteParticipant() {
+    setDeleteCandidate(undefined);
+    setDeleteStep(1);
+  }
+
+  function deleteParticipant() {
+    if (!deleteCandidate) {
+      return;
+    }
+
+    dispatch({ type: "deleteParticipant", participantId: deleteCandidate.id });
+    closeDeleteParticipant();
   }
 
   async function copyInviteLink() {
@@ -325,49 +318,61 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
                   const active = participant.id === state.activeParticipantId;
                   return (
                     <View key={participant.id} style={[styles.participantRow, active && styles.participantRowActive]}>
-                      <Pressable
-                        accessibilityLabel={`${participant.name}を編集中にする`}
-                        style={[styles.participantNumber, active && styles.participantNumberActive]}
-                        onPress={() => dispatch({ type: "setActiveParticipant", participantId: participant.id })}
-                      >
-                        <Text style={[styles.participantNumberText, active && styles.participantNumberTextActive]}>
-                          {participant.order}
-                        </Text>
-                      </Pressable>
-                      <View style={styles.participantInputs}>
-                        <TextInput
-                          value={participant.name}
-                          onChangeText={(name) =>
-                            dispatch({ type: "updateParticipantName", participantId: participant.id, name })
-                          }
-                          placeholder="参加者名"
-                          placeholderTextColor={colors.textMuted}
-                          style={[styles.input, styles.participantNameInput]}
-                        />
-                        <TextInput
-                          value={participant.markerLabel}
-                          onChangeText={(markerLabel) =>
-                            dispatch({ type: "updateParticipantLabel", participantId: participant.id, markerLabel })
-                          }
-                          placeholder="丸内"
-                          placeholderTextColor={colors.textMuted}
-                          maxLength={4}
-                          style={[styles.input, styles.markerInput]}
-                        />
+                      <View style={styles.participantEditLine}>
+                        <Pressable
+                          accessibilityLabel={`${participant.name}を編集中にする`}
+                          style={[styles.participantNumber, active && styles.participantNumberActive]}
+                          onPress={() => dispatch({ type: "setActiveParticipant", participantId: participant.id })}
+                        >
+                          <Text style={[styles.participantNumberText, active && styles.participantNumberTextActive]}>
+                            {participant.order}
+                          </Text>
+                        </Pressable>
+                        <View style={styles.participantInputs}>
+                          <TextInput
+                            value={participant.name}
+                            onChangeText={(name) =>
+                              dispatch({ type: "updateParticipantName", participantId: participant.id, name })
+                            }
+                            placeholder="参加者名"
+                            placeholderTextColor={colors.textMuted}
+                            style={[styles.input, styles.participantNameInput]}
+                          />
+                          <TextInput
+                            value={participant.markerLabel}
+                            onChangeText={(markerLabel) =>
+                              dispatch({ type: "updateParticipantLabel", participantId: participant.id, markerLabel })
+                            }
+                            placeholder="丸内"
+                            placeholderTextColor={colors.textMuted}
+                            maxLength={4}
+                            style={[styles.input, styles.markerInput]}
+                          />
+                        </View>
                       </View>
-                      <Pressable
-                        accessibilityLabel={`${participant.name}を削除`}
-                        style={[
-                          styles.participantDeleteButton,
-                          state.participants.length <= 1 && styles.participantDeleteButtonDisabled
-                        ]}
-                        onPress={() => confirmDeleteParticipant(participant)}
-                      >
-                        <Trash2
-                          size={16}
-                          color={state.participants.length <= 1 ? colors.textMuted : colors.danger}
-                        />
-                      </Pressable>
+                      <View style={styles.participantActionLine}>
+                        <Pressable
+                          accessibilityLabel={`${participant.name}を削除`}
+                          style={[
+                            styles.participantDeleteButton,
+                            state.participants.length <= 1 && styles.participantDeleteButtonDisabled
+                          ]}
+                          onPress={() => openDeleteParticipant(participant)}
+                        >
+                          <Trash2
+                            size={15}
+                            color={state.participants.length <= 1 ? colors.textMuted : colors.danger}
+                          />
+                          <Text
+                            style={[
+                              styles.participantDeleteText,
+                              state.participants.length <= 1 && styles.participantDeleteTextDisabled
+                            ]}
+                          >
+                            削除
+                          </Text>
+                        </Pressable>
+                      </View>
                     </View>
                   );
                 })}
@@ -423,6 +428,36 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
             <Text style={styles.helpText}>編集中の参加者: {activeParticipant.name}</Text>
           </View>
         </ScrollView>
+        {deleteCandidate ? (
+          <View style={styles.confirmOverlay}>
+            <Pressable style={styles.confirmBackdrop} onPress={closeDeleteParticipant} />
+            <View style={styles.confirmPanel}>
+              <Text style={styles.confirmTitle}>
+                {deleteStep === 1 ? "参加者を削除しますか？" : "本当に削除しますか？"}
+              </Text>
+              <Text style={styles.confirmMessage}>
+                {deleteStep === 1
+                  ? `「${deleteCandidate.name}」の全シートの丸配置も削除対象になります。`
+                  : "データは完全に失われます。この操作は元に戻せません。"}
+              </Text>
+              <View style={styles.confirmActions}>
+                <Pressable style={styles.confirmCancelButton} onPress={closeDeleteParticipant}>
+                  <Text style={styles.confirmCancelText}>キャンセル</Text>
+                </Pressable>
+                {deleteStep === 1 ? (
+                  <Pressable style={styles.confirmDangerButton} onPress={() => setDeleteStep(2)}>
+                    <Text style={styles.confirmDangerText}>次へ</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={styles.confirmDangerButton} onPress={deleteParticipant}>
+                    <Trash2 size={16} color="#ffffff" />
+                    <Text style={styles.confirmDangerText}>完全に削除</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          </View>
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -664,12 +699,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: 8,
-    flexDirection: "row",
     gap: 8,
     backgroundColor: colors.surfaceSoft
   },
   participantRowActive: {
     borderColor: colors.text
+  },
+  participantEditLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   participantNumber: {
     width: 34,
@@ -702,21 +741,35 @@ const styles = StyleSheet.create({
     flex: 1
   },
   markerInput: {
-    width: 78,
+    width: 70,
     textAlign: "center"
   },
+  participantActionLine: {
+    flexDirection: "row",
+    justifyContent: "flex-end"
+  },
   participantDeleteButton: {
-    width: 40,
-    height: 40,
+    minHeight: 34,
+    paddingHorizontal: 12,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 5,
     backgroundColor: colors.surface
   },
   participantDeleteButtonDisabled: {
     opacity: 0.48
+  },
+  participantDeleteText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  participantDeleteTextDisabled: {
+    color: colors.textMuted
   },
   statusLine: {
     minHeight: 34,
@@ -734,5 +787,78 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  confirmOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.32)"
+  },
+  confirmBackdrop: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0
+  },
+  confirmPanel: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    gap: 12,
+    backgroundColor: colors.surface
+  },
+  confirmTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  confirmMessage: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "700"
+  },
+  confirmActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  confirmCancelButton: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  confirmCancelText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  confirmDangerButton: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.danger
+  },
+  confirmDangerText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900"
   }
 });
