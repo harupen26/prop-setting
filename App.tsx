@@ -338,6 +338,19 @@ function AppShell() {
     });
   }
 
+  const guideOverlay = (
+    <GuideOverlay
+      visible={!!activeGuideMode}
+      step={currentGuideStep}
+      stepIndex={guideIndex}
+      stepCount={guideSteps.length}
+      onNext={showNextGuideStep}
+      onBack={showPreviousGuideStep}
+      onSkip={() => stopGuide(false)}
+      practiceMode={!!activeGuideMode}
+    />
+  );
+  const guideOverlayInSidebar = currentGuideStep?.screen === "sidebar" && drawerOpen;
   const guideLayers = (
     <>
       <HelpPanel visible={helpOpen} onClose={() => setHelpOpen(false)} onStartGuide={startGuide} />
@@ -346,16 +359,7 @@ function AppShell() {
         onStartGuide={startGuide}
         onDismiss={dismissIntroPrompt}
       />
-      <GuideOverlay
-        visible={!!activeGuideMode}
-        step={currentGuideStep}
-        stepIndex={guideIndex}
-        stepCount={guideSteps.length}
-        onNext={showNextGuideStep}
-        onBack={showPreviousGuideStep}
-        onSkip={() => stopGuide(false)}
-        practiceMode={!!activeGuideMode}
-      />
+      {guideOverlayInSidebar ? null : guideOverlay}
     </>
   );
 
@@ -370,7 +374,7 @@ function AppShell() {
 
   if (projectListOpen) {
     return (
-      <>
+      <View style={styles.appFrame}>
         <ProjectListScreen
           state={state}
           dispatch={dispatch}
@@ -379,7 +383,7 @@ function AppShell() {
           onGuideTargetPress={completeGuideTarget}
         />
         {guideLayers}
-      </>
+      </View>
     );
   }
 
@@ -620,6 +624,8 @@ function AppShell() {
         state={state}
         dispatch={dispatch}
         onClose={() => setDrawerOpen(false)}
+        onGuideTargetPress={completeGuideTarget}
+        guideOverlay={guideOverlayInSidebar ? guideOverlay : undefined}
       />
       <ParticipantManagerPanel
         visible={participantManagerOpen}
@@ -1117,6 +1123,12 @@ function NudgeButton({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    position: "relative",
+    backgroundColor: colors.background
+  },
+  appFrame: {
+    flex: 1,
+    position: "relative",
     backgroundColor: colors.background
   },
   loading: {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Modal,
   PanResponder,
@@ -32,6 +32,8 @@ type Props = {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
   onClose: () => void;
+  onGuideTargetPress?: (targetId: "sidebar-role-list") => void;
+  guideOverlay?: ReactNode;
 };
 
 const palette = [
@@ -60,7 +62,7 @@ type HsvColor = {
   value: number;
 };
 
-export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
+export function SidebarDrawer({ visible, state, dispatch, onClose, onGuideTargetPress, guideOverlay }: Props) {
   const selectedRole = getSelectedRole(state);
   const [newFolderName, setNewFolderName] = useState("");
   const [newRoleName, setNewRoleName] = useState("");
@@ -132,6 +134,7 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
 
   function selectRole(roleId: string) {
     dispatch({ type: "setSelectedRole", roleId });
+    onGuideTargetPress?.("sidebar-role-list");
     onClose();
   }
 
@@ -312,6 +315,7 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
             </GuideTarget>
           </ScrollView>
         </View>
+        {guideOverlay}
       </View>
     </Modal>
   );
@@ -320,6 +324,7 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
+    position: "relative",
     flexDirection: "row",
     justifyContent: "flex-end",
     backgroundColor: "rgba(15, 23, 42, 0.18)"

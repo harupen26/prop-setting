@@ -94,8 +94,20 @@ export const memberGuideSteps: GuideStep[] = [
     mode: "member",
     screen: "main",
     targetId: "role-select",
+    title: "手具画面を開く",
+    body: "「変更」を押して、置く手具を選ぶ画面を開いてみましょう。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "「変更」を押してください"
+  },
+  {
+    id: "member-role-pick",
+    mode: "member",
+    screen: "sidebar",
+    targetId: "sidebar-role-list",
     title: "置く手具を選ぶ",
-    body: "「変更」から手具を選びます。選んだ手具が次にドリルへ置かれます。"
+    body: "手具を1つ押すと選択できます。選んだ手具が次にドリルへ置かれます。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "手具を1つ押してください"
   },
   {
     id: "member-drill",

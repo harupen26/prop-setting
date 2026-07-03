@@ -180,49 +180,63 @@ export function GuideOverlay({
   const bubbleStyle = getBubbleStyle(targetLayout, dimensions.width, dimensions.height, step.placement);
   const finalStep = stepIndex >= stepCount - 1;
   const waitsForTargetPress = !!step.advanceOnTargetPress && !!step.targetId && !!targetLayout;
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onSkip}>
-      <View style={styles.overlay} pointerEvents={waitsForTargetPress ? "box-none" : "auto"}>
-        <OverlayScrim layout={targetLayout} width={dimensions.width} height={dimensions.height} />
-        {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
-        <View style={[styles.bubble, bubbleStyle]}>
-          <View style={styles.bubbleTop}>
-            <Text style={styles.progress}>
-              {stepIndex + 1} / {stepCount}
-            </Text>
-            <Pressable style={styles.closeTextButton} onPress={onSkip}>
-              <Text style={styles.closeText}>閉じる</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.title}>{step.title}</Text>
-          <Text style={styles.body}>{step.body}</Text>
-          {practiceMode ? (
-            <Text style={styles.practiceText}>練習中: チュートリアル終了時に操作内容は元に戻ります。</Text>
-          ) : null}
-          {waitsForTargetPress ? (
-            <Text style={styles.actionHint}>{step.targetActionLabel ?? "ハイライトされた場所を押してください"}</Text>
-          ) : null}
-          {!targetLayout && step.targetId ? (
-            <Text style={styles.fallbackText}>対象のボタンが見つからないため、説明カードで表示しています。</Text>
-          ) : null}
-          <View style={styles.actions}>
-            <Pressable style={styles.ghostButton} onPress={onSkip}>
-              <Text style={styles.ghostButtonText}>スキップ</Text>
-            </Pressable>
-            <View style={styles.actionRight}>
-              {stepIndex > 0 ? (
-                <Pressable style={styles.secondaryButton} onPress={onBack}>
-                  <Text style={styles.secondaryButtonText}>戻る</Text>
-                </Pressable>
-              ) : null}
-              <Pressable style={styles.primaryButton} onPress={onNext}>
-                <Text style={styles.primaryButtonText}>{waitsForTargetPress ? "次へ進む" : finalStep ? "完了" : "次へ"}</Text>
+  const content = (
+    <View style={waitsForTargetPress ? styles.floatingOverlay : styles.overlay} pointerEvents={waitsForTargetPress ? "box-none" : "auto"}>
+      <OverlayScrim
+        layout={targetLayout}
+        width={dimensions.width}
+        height={dimensions.height}
+        allowTargetPress={waitsForTargetPress}
+      />
+      {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
+      <View style={[styles.bubble, bubbleStyle]}>
+        <View style={styles.bubbleTop}>
+          <Text style={styles.progress}>
+            {stepIndex + 1} / {stepCount}
+          </Text>
+          <Pressable style={styles.closeTextButton} onPress={onSkip}>
+            <Text style={styles.closeText}>閉じる</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.title}>{step.title}</Text>
+        <Text style={styles.body}>{step.body}</Text>
+        {practiceMode ? (
+          <Text style={styles.practiceText}>練習中: チュートリアル終了時に操作内容は元に戻ります。</Text>
+        ) : null}
+        {waitsForTargetPress ? (
+          <Text style={styles.actionHint}>{step.targetActionLabel ?? "ハイライトされた場所を押してください"}</Text>
+        ) : null}
+        {!targetLayout && step.targetId ? (
+          <Text style={styles.fallbackText}>対象のボタンが見つからないため、説明カードで表示しています。</Text>
+        ) : null}
+        <View style={styles.actions}>
+          <Pressable style={styles.ghostButton} onPress={onSkip}>
+            <Text style={styles.ghostButtonText}>スキップ</Text>
+          </Pressable>
+          <View style={styles.actionRight}>
+            {stepIndex > 0 ? (
+              <Pressable style={styles.secondaryButton} onPress={onBack}>
+                <Text style={styles.secondaryButtonText}>戻る</Text>
               </Pressable>
-            </View>
+            ) : null}
+            {!waitsForTargetPress ? (
+              <Pressable style={styles.primaryButton} onPress={onNext}>
+                <Text style={styles.primaryButtonText}>{finalStep ? "完了" : "次へ"}</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
       </View>
+    </View>
+  );
+
+  if (waitsForTargetPress) {
+    return content;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onSkip}>
+      {content}
     </Modal>
   );
 }
@@ -230,16 +244,19 @@ export function GuideOverlay({
 function OverlayScrim({
   layout,
   width,
-  height
+  height,
+  allowTargetPress = false
 }: {
   layout: TargetLayout | undefined;
   width: number;
   height: number;
+  allowTargetPress?: boolean;
 }) {
   if (!layout) {
-    return <View style={styles.fullScrim} />;
+    return <View pointerEvents={allowTargetPress ? "none" : "auto"} style={styles.fullScrim} />;
   }
 
+  const blockOutsideTouch = allowTargetPress ? { onStartShouldSetResponder: () => true } : undefined;
   const highlight = expandLayout(layout);
   const topHeight = Math.max(0, highlight.y);
   const bottomTop = Math.min(height, highlight.y + highlight.height);
@@ -248,10 +265,11 @@ function OverlayScrim({
 
   return (
     <>
-      <View style={[styles.scrimPiece, { left: 0, right: 0, top: 0, height: topHeight }]} />
-      <View style={[styles.scrimPiece, { left: 0, right: 0, top: bottomTop, bottom: 0 }]} />
-      <View style={[styles.scrimPiece, { left: 0, top: sideTop, width: Math.max(0, highlight.x), height: sideHeight }]} />
+      <View {...blockOutsideTouch} style={[styles.scrimPiece, { left: 0, right: 0, top: 0, height: topHeight }]} />
+      <View {...blockOutsideTouch} style={[styles.scrimPiece, { left: 0, right: 0, top: bottomTop, bottom: 0 }]} />
+      <View {...blockOutsideTouch} style={[styles.scrimPiece, { left: 0, top: sideTop, width: Math.max(0, highlight.x), height: sideHeight }]} />
       <View
+        {...blockOutsideTouch}
         style={[
           styles.scrimPiece,
           {
@@ -335,6 +353,11 @@ function clamp(value: number, min: number, max: number): number {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1
+  },
+  floatingOverlay: {
+    ...StyleSheet.absoluteFill,
+    elevation: 1000,
+    zIndex: 1000
   },
   fullScrim: {
     ...StyleSheet.absoluteFill,
