@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch } from "react";
+import { useMemo, useState, type Dispatch, type ReactNode } from "react";
 import {
   Alert,
   Modal,
@@ -42,6 +42,7 @@ type ProjectSettingsProps = {
   onClose: () => void;
   onBackToProjects: () => void;
   onExportPdf: () => void;
+  guideOverlay?: ReactNode;
 };
 
 type ParticipantManagerProps = {
@@ -49,6 +50,7 @@ type ParticipantManagerProps = {
   state: AppState;
   dispatch: Dispatch<AppAction>;
   onClose: () => void;
+  guideOverlay?: ReactNode;
 };
 
 export function ProjectSettingsPanel({
@@ -57,7 +59,8 @@ export function ProjectSettingsPanel({
   dispatch,
   onClose,
   onBackToProjects,
-  onExportPdf
+  onExportPdf,
+  guideOverlay
 }: ProjectSettingsProps) {
   const activeProject = getActiveProject(state);
   const activeCompetition = getActiveCompetition(state);
@@ -234,12 +237,13 @@ export function ProjectSettingsPanel({
             </Pressable>
           </View>
         </ScrollView>
+        {guideOverlay}
       </SafeAreaView>
     </Modal>
   );
 }
 
-export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: ParticipantManagerProps) {
+export function ParticipantManagerPanel({ visible, state, dispatch, onClose, guideOverlay }: ParticipantManagerProps) {
   const activeProject = getActiveProject(state);
   const activeParticipant = getActiveParticipant(state);
   const integratedIds = state.integratedParticipantIdsByCompetition[state.activeCompetitionId] ?? [];
@@ -472,6 +476,7 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
             </View>
           </View>
         ) : null}
+        {guideOverlay}
       </SafeAreaView>
     </Modal>
   );
@@ -480,6 +485,7 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    position: "relative",
     backgroundColor: colors.background
   },
   topBar: {

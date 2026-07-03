@@ -2,6 +2,10 @@ import type { AppState, ApparatusRole, Competition, Marker, Project, RoleFolder,
 import { initialAppState } from "../data/seed";
 import { clampMarkerLabel, deriveMarkerLabelFromName } from "../domain/labels";
 
+const SAMPLE_PROJECT_ID = "project-yokohama-robins";
+const LEGACY_SAMPLE_SHARE_ID = "YR-2026";
+const CURRENT_SAMPLE_SHARE_ID = "YRCG2025";
+
 export type AppAction =
   | { type: "hydrate"; state: AppState }
   | { type: "reset" }
@@ -350,11 +354,19 @@ function normalizeProjects(state: AppState): Project[] {
   if (state.projects?.length) {
     return state.projects.map((project) => ({
       ...project,
-      shareId: project.shareId || createProjectShareId(project.id)
+      shareId: normalizeProjectShareId(project)
     }));
   }
 
   return initialAppState.projects;
+}
+
+function normalizeProjectShareId(project: Project): string {
+  if (project.id === SAMPLE_PROJECT_ID && project.shareId === LEGACY_SAMPLE_SHARE_ID) {
+    return CURRENT_SAMPLE_SHARE_ID;
+  }
+
+  return project.shareId || createProjectShareId(project.id);
 }
 
 function normalizeCompetitions(state: AppState, fallbackProjectId: string): Competition[] {

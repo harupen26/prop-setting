@@ -6,7 +6,7 @@ export const projects: Project[] = [
   {
     id: "project-yokohama-robins",
     name: "YOKOHAMA ROBINS",
-    shareId: "YR-2026",
+    shareId: "YRCG2025",
     createdAt: now
   }
 ];

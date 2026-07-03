@@ -2,6 +2,7 @@ import { type Dispatch, type ReactNode, useEffect, useMemo, useRef, useState } f
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -74,6 +75,8 @@ type GuideUiSnapshot = {
   selectedMarkerId: string | undefined;
 };
 
+const GUIDE_ADVANCE_DELAY_MS = 320;
+
 export default function App() {
   return (
     <GuideProvider>
@@ -87,6 +90,8 @@ function AppShell() {
   const { preferences, guideHydrated, markIntroSeen, markGuideCompleted } = useGuidePreferences();
   const guideStateSnapshotRef = useRef<AppState | undefined>(undefined);
   const guideUiSnapshotRef = useRef<GuideUiSnapshot | undefined>(undefined);
+  const guideAdvanceLockedRef = useRef(false);
+  const mainScrollRef = useRef<ScrollView | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [projectListOpen, setProjectListOpen] = useState(true);
   const [participantManagerOpen, setParticipantManagerOpen] = useState(false);
@@ -124,6 +129,45 @@ function AppShell() {
 
     setIntroOpen(true);
   }, [activeGuideMode, guideHydrated, hydrated, preferences.hasSeenIntroTutorial]);
+
+  useEffect(() => {
+    if (!activeGuideMode || projectListOpen) {
+      return undefined;
+    }
+
+    const targetId = currentGuideStep?.targetId;
+    if (!targetId) {
+      return undefined;
+    }
+
+    const first = setTimeout(() => {
+      if (targetId === "marker-nudge-controls") {
+        setCanvasInteractionLocked(false);
+        mainScrollRef.current?.scrollToEnd({ animated: true });
+        return;
+      }
+
+      if (
+        targetId === "phase-tabs" ||
+        targetId === "view-mode-tabs" ||
+        targetId === "participant-list" ||
+        targetId === "role-select"
+      ) {
+        mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    }, 220);
+
+    const second = setTimeout(() => {
+      if (targetId === "marker-nudge-controls") {
+        mainScrollRef.current?.scrollToEnd({ animated: true });
+      }
+    }, 620);
+
+    return () => {
+      clearTimeout(first);
+      clearTimeout(second);
+    };
+  }, [activeGuideMode, currentGuideStep?.targetId, projectListOpen, selectedMarkerId]);
 
   function placeMarker(xSnap: number, ySnap: number) {
     if (!selectedRole) {
@@ -204,6 +248,8 @@ function AppShell() {
       return;
     }
 
+    setCanvasInteractionLocked(false);
+
     if (step.screen === "projectList") {
       setProjectListOpen(true);
       closeSecondaryPanels();
@@ -260,6 +306,7 @@ function AppShell() {
       projectSettingsOpen,
       selectedMarkerId
     };
+    guideAdvanceLockedRef.current = false;
     setHelpOpen(false);
     setIntroOpen(false);
     setActiveGuideMode(mode);
@@ -290,8 +337,21 @@ function AppShell() {
     }
     guideStateSnapshotRef.current = undefined;
     guideUiSnapshotRef.current = undefined;
+    guideAdvanceLockedRef.current = false;
     setActiveGuideMode(undefined);
     setGuideIndex(0);
+  }
+
+  function scheduleNextGuideStep() {
+    if (guideAdvanceLockedRef.current) {
+      return;
+    }
+
+    guideAdvanceLockedRef.current = true;
+    setTimeout(() => {
+      guideAdvanceLockedRef.current = false;
+      showNextGuideStep();
+    }, GUIDE_ADVANCE_DELAY_MS);
   }
 
   function completeGuideTarget(targetId: GuideStep["targetId"]) {
@@ -299,7 +359,7 @@ function AppShell() {
       return;
     }
 
-    setTimeout(showNextGuideStep, 180);
+    scheduleNextGuideStep();
   }
 
   function completeGuideStep(stepId: string) {
@@ -307,7 +367,7 @@ function AppShell() {
       return;
     }
 
-    setTimeout(showNextGuideStep, 180);
+    scheduleNextGuideStep();
   }
 
   function showNextGuideStep() {
@@ -322,6 +382,7 @@ function AppShell() {
   }
 
   function showPreviousGuideStep() {
+    guideAdvanceLockedRef.current = false;
     const nextIndex = Math.max(0, guideIndex - 1);
     setGuideIndex(nextIndex);
     prepareGuideStep(guideSteps[nextIndex]);
@@ -348,7 +409,7 @@ function AppShell() {
     });
   }
 
-  const guideOverlay = (
+  const renderGuideOverlay = (embedded = false) => (
     <GuideOverlay
       visible={!!activeGuideMode}
       step={currentGuideStep}
@@ -357,11 +418,23 @@ function AppShell() {
       onNext={showNextGuideStep}
       onBack={showPreviousGuideStep}
       onSkip={() => stopGuide(false)}
+      embedded={embedded}
       practiceMode={!!activeGuideMode}
     />
   );
+  const guideOverlay = renderGuideOverlay(false);
+  const embeddedGuideOverlay = renderGuideOverlay(true);
   const guideOverlayInSidebar = currentGuideStep?.screen === "sidebar" && drawerOpen;
   const guideOverlayInProjectAction = isProjectActionGuideTarget(currentGuideStep?.targetId);
+  const guideOverlayInParticipantManager = currentGuideStep?.screen === "participantManager" && participantManagerOpen;
+  const guideOverlayInProjectSettings = currentGuideStep?.screen === "projectSettings" && projectSettingsOpen;
+  const guideOverlayInPdf = currentGuideStep?.screen === "pdf" && pdfOptionsOpen;
+  const guideOverlayInEmbeddedModal =
+    guideOverlayInSidebar ||
+    guideOverlayInProjectAction ||
+    guideOverlayInParticipantManager ||
+    guideOverlayInProjectSettings ||
+    guideOverlayInPdf;
   const guideLayers = (
     <>
       <HelpPanel visible={helpOpen} onClose={() => setHelpOpen(false)} onStartGuide={startGuide} />
@@ -370,7 +443,7 @@ function AppShell() {
         onStartGuide={startGuide}
         onDismiss={dismissIntroPrompt}
       />
-      {guideOverlayInSidebar || guideOverlayInProjectAction ? null : guideOverlay}
+      {guideOverlayInEmbeddedModal ? null : guideOverlay}
     </>
   );
 
@@ -392,7 +465,7 @@ function AppShell() {
           onOpenProject={openProject}
           onOpenHelp={() => setHelpOpen(true)}
           onGuideTargetPress={completeGuideTarget}
-          guideOverlay={guideOverlayInProjectAction ? guideOverlay : undefined}
+          guideOverlay={guideOverlayInProjectAction ? embeddedGuideOverlay : undefined}
         />
         {guideLayers}
       </View>
@@ -455,6 +528,7 @@ function AppShell() {
       </View>
 
       <ScrollView
+        ref={mainScrollRef}
         contentContainerStyle={styles.content}
         scrollEnabled={!canvasInteractionLocked}
         showsVerticalScrollIndicator={false}
@@ -652,13 +726,14 @@ function AppShell() {
         dispatch={dispatch}
         onClose={() => setDrawerOpen(false)}
         onGuideTargetPress={completeGuideTarget}
-        guideOverlay={guideOverlayInSidebar ? guideOverlay : undefined}
+        guideOverlay={guideOverlayInSidebar ? embeddedGuideOverlay : undefined}
       />
       <ParticipantManagerPanel
         visible={participantManagerOpen}
         state={state}
         dispatch={dispatch}
         onClose={() => setParticipantManagerOpen(false)}
+        guideOverlay={guideOverlayInParticipantManager ? embeddedGuideOverlay : undefined}
       />
       <ProjectSettingsPanel
         visible={projectSettingsOpen}
@@ -670,6 +745,7 @@ function AppShell() {
           setProjectListOpen(true);
         }}
         onExportPdf={openPdfOptions}
+        guideOverlay={guideOverlayInProjectSettings ? embeddedGuideOverlay : undefined}
       />
       <PdfOptionsModal
         visible={pdfOptionsOpen}
@@ -678,6 +754,7 @@ function AppShell() {
         onChange={setPdfOptions}
         onClose={() => setPdfOptionsOpen(false)}
         onSave={() => exportPdf(pdfOptions)}
+        guideOverlay={guideOverlayInPdf ? embeddedGuideOverlay : undefined}
       />
       {guideLayers}
     </SafeAreaView>
@@ -909,7 +986,7 @@ function ProjectListScreen({
                   <TextInput
                     value={createInviteId}
                     onChangeText={(value) => setCreateInviteId(formatInviteIdInput(value))}
-                    placeholder="YR-2026"
+                    placeholder="YRCG2025"
                     placeholderTextColor={colors.textMuted}
                     autoCapitalize="characters"
                     autoCorrect={false}
@@ -951,6 +1028,7 @@ function ProjectListScreen({
                       const formatted = formatInviteIdInput(value);
                       setJoinInviteId(formatted);
                       if (formatted === SAMPLE_INVITE_ID) {
+                        Keyboard.dismiss();
                         onGuideTargetPress("project-join-invite-input");
                       }
                     }}
@@ -985,7 +1063,7 @@ function ProjectListScreen({
 
 const INVITE_ID_HELP = "使える文字: 半角英数字・ハイフン(-)・アンダーバー(_) / 3〜24文字";
 const INVITE_ID_PATTERN = /^[A-Z0-9_-]{3,24}$/;
-const SAMPLE_INVITE_ID = "YR-2026";
+const SAMPLE_INVITE_ID = "YRCG2025";
 
 function formatInviteIdInput(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase().slice(0, 24);
@@ -1029,7 +1107,8 @@ function PdfOptionsModal({
   options,
   onChange,
   onClose,
-  onSave
+  onSave,
+  guideOverlay
 }: {
   visible: boolean;
   state: ReturnType<typeof usePersistentState>["state"];
@@ -1037,6 +1116,7 @@ function PdfOptionsModal({
   onChange: (options: PdfExportOptions) => void;
   onClose: () => void;
   onSave: () => void;
+  guideOverlay?: ReactNode;
 }) {
   const selectedParticipantId = options.participantId ?? state.activeParticipantId;
   const targetLabel = getPdfTargetLabel(state, normalizePdfOptions(options, state.activeParticipantId));
@@ -1126,6 +1206,7 @@ function PdfOptionsModal({
             </GuideTarget>
           </View>
         </View>
+        {guideOverlay}
       </View>
     </Modal>
   );

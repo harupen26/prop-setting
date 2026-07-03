@@ -10,6 +10,8 @@ import {
   type RefObject
 } from "react";
 import {
+  Animated,
+  Easing,
   Modal,
   Pressable,
   StyleSheet,
@@ -46,6 +48,8 @@ const BUBBLE_GAP = 10;
 const BUBBLE_WIDTH = 304;
 const ESTIMATED_BUBBLE_HEIGHT = 178;
 const ACTION_FALLBACK_DELAY_MS = 4200;
+const FADE_IN_DELAY_MS = 90;
+const FADE_IN_DURATION_MS = 240;
 
 export function GuideProvider({ children }: { children: ReactNode }) {
   const targetsRef = useRef(new Map<GuideTargetId, RefObject<View | null>>());
@@ -134,6 +138,7 @@ export function GuideOverlay({
   onNext,
   onBack,
   onSkip,
+  embedded = false,
   practiceMode = false
 }: {
   visible: boolean;
@@ -143,6 +148,7 @@ export function GuideOverlay({
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
+  embedded?: boolean;
   practiceMode?: boolean;
 }) {
   const registry = useContext(GuideContext);
@@ -152,6 +158,7 @@ export function GuideOverlay({
   const [targetLayout, setTargetLayout] = useState<TargetLayout | undefined>();
   const [bubbleHeight, setBubbleHeight] = useState(ESTIMATED_BUBBLE_HEIGHT);
   const [actionFallbackVisible, setActionFallbackVisible] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const stepId = step?.id;
   const waitsForTargetAction = !!step?.advanceOnTargetPress && !!step.targetId;
 
@@ -183,19 +190,34 @@ export function GuideOverlay({
   useEffect(() => {
     setBubbleHeight(ESTIMATED_BUBBLE_HEIGHT);
     setActionFallbackVisible(false);
+    fadeAnim.setValue(0);
 
-    if (!visible || !waitsForTargetAction) {
+    if (!visible) {
       return undefined;
     }
 
-    const timer = setTimeout(() => {
-      setActionFallbackVisible(true);
-    }, ACTION_FALLBACK_DELAY_MS);
+    const fadeTimer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: FADE_IN_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false
+      }).start();
+    }, FADE_IN_DELAY_MS);
+
+    const fallbackTimer = waitsForTargetAction
+      ? setTimeout(() => {
+          setActionFallbackVisible(true);
+        }, ACTION_FALLBACK_DELAY_MS)
+      : undefined;
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(fadeTimer);
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+      }
     };
-  }, [stepId, visible, waitsForTargetAction]);
+  }, [fadeAnim, stepId, visible, waitsForTargetAction]);
 
   if (!step) {
     return null;
@@ -205,6 +227,7 @@ export function GuideOverlay({
   const finalStep = stepIndex >= stepCount - 1;
   const showPrimaryButton = !waitsForTargetAction || actionFallbackVisible;
   const primaryButtonLabel = waitsForTargetAction ? "できない時は次へ" : finalStep ? "完了" : "次へ";
+  const useFloatingOverlay = waitsForTargetAction || embedded;
   const handleBubbleLayout = (event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
     if (Math.abs(nextHeight - bubbleHeight) > 2) {
@@ -212,7 +235,23 @@ export function GuideOverlay({
     }
   };
   const content = (
-    <View style={waitsForTargetAction ? styles.floatingOverlay : styles.overlay} pointerEvents={waitsForTargetAction ? "box-none" : "auto"}>
+    <Animated.View
+      style={[
+        useFloatingOverlay ? styles.floatingOverlay : styles.overlay,
+        {
+          opacity: fadeAnim,
+          transform: [
+            {
+              translateY: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [6, 0]
+              })
+            }
+          ]
+        }
+      ]}
+      pointerEvents={waitsForTargetAction ? "box-none" : "auto"}
+    >
       <OverlayScrim
         layout={targetLayout}
         width={dimensions.width}
@@ -220,7 +259,11 @@ export function GuideOverlay({
         allowTargetPress={waitsForTargetAction}
       />
       {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
-      <View style={[styles.bubble, bubbleStyle]} onLayout={handleBubbleLayout}>
+      <View
+        pointerEvents={waitsForTargetAction ? "box-none" : "auto"}
+        style={[styles.bubble, bubbleStyle]}
+        onLayout={handleBubbleLayout}
+      >
         <View style={styles.bubbleTop}>
           <Text style={styles.progress}>
             {stepIndex + 1} / {stepCount}
@@ -258,10 +301,10 @@ export function GuideOverlay({
           </View>
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 
-  if (waitsForTargetAction) {
+  if (waitsForTargetAction || embedded) {
     return content;
   }
 

@@ -94,10 +94,10 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-join-invite-input",
     title: "招待IDを入力",
-    body: "YR-2026 と入力します。",
+    body: "YRCG2025 と入力します。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "YR-2026 と入力してください"
+    targetActionLabel: "YRCG2025 と入力してください"
   },
   {
     id: "member-project-join-submit",
