@@ -239,8 +239,8 @@ function buildMarkerNode(
 
   const base = snapToCoordinate(marker, { width: DRILL_WIDTH, height: DRILL_HEIGHT });
   const offset = getOverlapOffset(marker, overlap, {
-    x: DRILL_WIDTH / SNAP.xMax,
-    y: DRILL_HEIGHT / SNAP.yMax
+    x: (DRILL_WIDTH / SNAP.xMax) * SNAP.fineStep,
+    y: (DRILL_HEIGHT / SNAP.yMax) * SNAP.fineStep
   });
   const x = base.x + offset.dx;
   const y = base.y + offset.dy;

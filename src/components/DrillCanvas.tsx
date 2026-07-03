@@ -87,7 +87,10 @@ export function DrillCanvas({
   const size = useMemo(() => ({ width: viewportWidth, height }), [height, viewportWidth]);
   const overlap = useMemo(() => buildOverlapMap(markers, { folders, roles }), [folders, markers, roles]);
   const overlapStepPx = useMemo(
-    () => ({ x: snapXToCanvas(1, viewportWidth), y: snapYToCanvas(1, height) }),
+    () => ({
+      x: snapXToCanvas(SNAP.fineStep, viewportWidth),
+      y: snapYToCanvas(SNAP.fineStep, height)
+    }),
     [height, viewportWidth]
   );
   const markerViews = useMemo(
