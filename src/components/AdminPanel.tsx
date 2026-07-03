@@ -25,7 +25,7 @@ import {
 } from "lucide-react-native";
 
 import type { AppAction } from "../state/appReducer";
-import type { AppState, Competition } from "../types";
+import type { AppState, Competition, Participant } from "../types";
 import { colors, radius } from "../theme";
 import {
   getActiveCompetition,
@@ -248,6 +248,39 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
     setNewParticipantName("");
   }
 
+  function confirmDeleteParticipant(participant: Participant) {
+    if (state.participants.length <= 1) {
+      Alert.alert("最後の参加者は削除できません", "少なくとも1人の参加者が必要です。");
+      return;
+    }
+
+    Alert.alert(
+      "参加者を削除しますか？",
+      `「${participant.name}」の全シートの丸配置も削除対象になります。`,
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: "次へ",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "本当に削除しますか？",
+              "データは完全に失われます。この操作は元に戻せません。",
+              [
+                { text: "キャンセル", style: "cancel" },
+                {
+                  text: "完全に削除",
+                  style: "destructive",
+                  onPress: () => dispatch({ type: "deleteParticipant", participantId: participant.id })
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  }
+
   async function copyInviteLink() {
     await Clipboard.setStringAsync(inviteLink);
     Alert.alert("招待リンクをコピーしました", inviteLink);
@@ -322,6 +355,19 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
                           style={[styles.input, styles.markerInput]}
                         />
                       </View>
+                      <Pressable
+                        accessibilityLabel={`${participant.name}を削除`}
+                        style={[
+                          styles.participantDeleteButton,
+                          state.participants.length <= 1 && styles.participantDeleteButtonDisabled
+                        ]}
+                        onPress={() => confirmDeleteParticipant(participant)}
+                      >
+                        <Trash2
+                          size={16}
+                          color={state.participants.length <= 1 ? colors.textMuted : colors.danger}
+                        />
+                      </Pressable>
                     </View>
                   );
                 })}
@@ -341,7 +387,7 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
               </Pressable>
             </View>
             <Text style={styles.helpText}>
-              名前を変えると丸内ラベルも自動更新されます。丸内だけ変えたい場合は右の欄を編集してください。
+              名前を変えると丸内ラベルも自動更新されます。削除すると、その参加者の全シートの丸配置も削除されます。
             </Text>
           </View>
 
@@ -658,6 +704,19 @@ const styles = StyleSheet.create({
   markerInput: {
     width: 78,
     textAlign: "center"
+  },
+  participantDeleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface
+  },
+  participantDeleteButtonDisabled: {
+    opacity: 0.48
   },
   statusLine: {
     minHeight: 34,

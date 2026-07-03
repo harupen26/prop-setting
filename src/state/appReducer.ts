@@ -20,6 +20,7 @@ export type AppAction =
   | { type: "addFolder"; folder: RoleFolder }
   | { type: "addRole"; role: ApparatusRole }
   | { type: "addParticipant"; name: string }
+  | { type: "deleteParticipant"; participantId: string }
   | { type: "updateParticipantName"; participantId: string; name: string }
   | { type: "updateParticipantLabel"; participantId: string; markerLabel: string }
   | { type: "updateProjectName"; projectId: string; name: string }
@@ -137,6 +138,44 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             token: createParticipantToken(id, name)
           }
         ]
+      };
+    }
+    case "deleteParticipant": {
+      if (state.participants.length <= 1) {
+        return state;
+      }
+
+      const sortedParticipants = state.participants.slice().sort((a, b) => a.order - b.order);
+      const targetIndex = sortedParticipants.findIndex((participant) => participant.id === action.participantId);
+      if (targetIndex < 0) {
+        return state;
+      }
+
+      const remainingParticipants = state.participants.filter(
+        (participant) => participant.id !== action.participantId
+      );
+      const sortedRemainingParticipants = sortedParticipants.filter(
+        (participant) => participant.id !== action.participantId
+      );
+      const fallbackParticipant =
+        sortedRemainingParticipants[Math.min(targetIndex, sortedRemainingParticipants.length - 1)] ??
+        sortedRemainingParticipants[0];
+      const integratedParticipantIdsByCompetition = Object.fromEntries(
+        Object.entries(state.integratedParticipantIdsByCompetition).map(([competitionId, participantIds]) => [
+          competitionId,
+          participantIds.filter((participantId) => participantId !== action.participantId)
+        ])
+      );
+
+      return {
+        ...state,
+        activeParticipantId:
+          state.activeParticipantId === action.participantId
+            ? fallbackParticipant.id
+            : state.activeParticipantId,
+        participants: remainingParticipants,
+        markers: state.markers.filter((marker) => marker.participantId !== action.participantId),
+        integratedParticipantIdsByCompetition
       };
     }
     case "updateParticipantName":

@@ -113,6 +113,42 @@ describe("統合", () => {
     expect(result.viewMode).toBe("participant");
   });
 
+  it("参加者を削除すると丸と統合設定も削除し次の参加者を選ぶ", () => {
+    const state = {
+      ...initialAppState,
+      activeParticipantId: "participant-1",
+      markers: [
+        marker("delete-marker", "participant-1", 10),
+        marker("keep-marker", "participant-2", 20)
+      ],
+      integratedParticipantIdsByCompetition: {
+        "competition-1": ["participant-1", "participant-2"]
+      }
+    };
+
+    const result = appReducer(state, { type: "deleteParticipant", participantId: "participant-1" });
+
+    expect(result.activeParticipantId).toBe("participant-2");
+    expect(result.participants.some((participant) => participant.id === "participant-1")).toBe(false);
+    expect(result.markers.map((item) => item.id)).toEqual(["keep-marker"]);
+    expect(result.integratedParticipantIdsByCompetition["competition-1"]).toEqual(["participant-2"]);
+  });
+
+  it("最後の参加者は削除しない", () => {
+    const state = {
+      ...initialAppState,
+      participants: [initialAppState.participants[0]],
+      activeParticipantId: "participant-1",
+      markers: [marker("keep-marker", "participant-1", 10)]
+    };
+
+    const result = appReducer(state, { type: "deleteParticipant", participantId: "participant-1" });
+
+    expect(result.participants).toHaveLength(1);
+    expect(result.activeParticipantId).toBe("participant-1");
+    expect(result.markers).toHaveLength(1);
+  });
+
   it("シートコピーは同じプロジェクトの新しいバージョンとして追加される", () => {
     const result = appReducer(initialAppState, {
       type: "duplicateCompetition",
