@@ -42,7 +42,7 @@ type GuideRegistry = {
 const GuideContext = createContext<GuideRegistry | undefined>(undefined);
 
 const OVERLAY_COLOR = "rgba(15, 23, 42, 0.62)";
-const ACTION_OVERLAY_COLOR = "rgba(15, 23, 42, 0.2)";
+const ACTION_OVERLAY_COLOR = "rgba(15, 23, 42, 0.12)";
 const TARGET_PADDING = 7;
 const BUBBLE_MARGIN = 10;
 const BUBBLE_GAP = 10;
@@ -224,7 +224,7 @@ export function GuideOverlay({
     };
   }, [fadeAnim, stepId, visible, waitsForTargetAction]);
 
-  if (!step) {
+  if (!visible || !step) {
     return null;
   }
 
@@ -233,6 +233,7 @@ export function GuideOverlay({
   const showPrimaryButton = !waitsForTargetAction || actionFallbackVisible;
   const primaryButtonLabel = waitsForTargetAction ? "できない時は次へ" : finalStep ? "完了" : "次へ";
   const useFloatingOverlay = waitsForTargetAction || embedded;
+  const showPracticeNote = practiceMode && stepIndex === 0;
   const handleBubbleLayout = (event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
     if (Math.abs(nextHeight - bubbleHeight) > 2) {
@@ -280,7 +281,7 @@ export function GuideOverlay({
         </View>
         <Text style={styles.title}>{step.title}</Text>
         <Text style={styles.body}>{step.body}</Text>
-        {practiceMode ? (
+        {showPracticeNote ? (
           <Text style={styles.practiceText}>練習中: チュートリアル終了時に操作内容は元に戻ります。</Text>
         ) : null}
         {waitsForTargetAction ? (
@@ -412,10 +413,15 @@ function getBubbleStyle(
   const maxTop = Math.max(BUBBLE_MARGIN, screenHeight - bubbleHeight - BUBBLE_MARGIN);
   const maxHeight = Math.max(140, screenHeight - BUBBLE_MARGIN * 2);
 
-  if (!layout || placement === "center") {
+  if (!layout || placement === "center" || placement === "screen-top" || placement === "screen-bottom") {
     return {
       left: (screenWidth - width) / 2,
-      top: clamp((screenHeight - bubbleHeight) / 2, BUBBLE_MARGIN, maxTop),
+      top:
+        placement === "screen-top"
+          ? BUBBLE_MARGIN
+          : placement === "screen-bottom"
+            ? maxTop
+            : clamp((screenHeight - bubbleHeight) / 2, BUBBLE_MARGIN, maxTop),
       width,
       maxHeight
     };

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Modal,
   PanResponder,
@@ -26,6 +26,7 @@ import type { AppState, ApparatusRole } from "../types";
 import { colors, radius, shadow } from "../theme";
 import { getSelectedRole } from "../selectors";
 import { GuideTarget } from "../guide/GuideOverlay";
+import type { GuideTargetId } from "../guide/guideContent";
 
 type Props = {
   visible: boolean;
@@ -34,6 +35,7 @@ type Props = {
   onClose: () => void;
   onGuideTargetPress?: (targetId: "sidebar-role-list") => void;
   guideOverlay?: ReactNode;
+  guideTargetId?: GuideTargetId;
 };
 
 const palette = [
@@ -62,7 +64,16 @@ type HsvColor = {
   value: number;
 };
 
-export function SidebarDrawer({ visible, state, dispatch, onClose, onGuideTargetPress, guideOverlay }: Props) {
+export function SidebarDrawer({
+  visible,
+  state,
+  dispatch,
+  onClose,
+  onGuideTargetPress,
+  guideOverlay,
+  guideTargetId
+}: Props) {
+  const scrollRef = useRef<ScrollView | null>(null);
   const selectedRole = getSelectedRole(state);
   const [newFolderName, setNewFolderName] = useState("");
   const [newRoleName, setNewRoleName] = useState("");
@@ -82,6 +93,27 @@ export function SidebarDrawer({ visible, state, dispatch, onClose, onGuideTarget
     grouped.forEach((list) => list.sort((a, b) => a.order - b.order));
     return grouped;
   }, [state.roles]);
+
+  useEffect(() => {
+    if (!visible || !guideTargetId) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      if (guideTargetId === "sidebar-add-role") {
+        scrollRef.current?.scrollToEnd({ animated: true });
+        return;
+      }
+
+      if (guideTargetId === "sidebar-role-list") {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    }, 260);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [guideTargetId, visible]);
 
   function addFolder() {
     const name = newFolderName.trim();
@@ -153,7 +185,7 @@ export function SidebarDrawer({ visible, state, dispatch, onClose, onGuideTarget
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
             <GuideTarget targetId="sidebar-role-list" style={styles.roleListGuideTarget}>
               {state.folders
                 .slice()

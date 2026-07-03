@@ -76,6 +76,8 @@ type GuideUiSnapshot = {
 };
 
 const GUIDE_ADVANCE_DELAY_MS = 320;
+const GUIDE_NUDGE_ADVANCE_DELAY_MS = 3000;
+const GUIDE_SCREEN_TRANSITION_DELAY_MS = 260;
 
 export default function App() {
   return (
@@ -100,6 +102,7 @@ function AppShell() {
   const [introOpen, setIntroOpen] = useState(false);
   const [activeGuideMode, setActiveGuideMode] = useState<GuideMode | undefined>();
   const [guideIndex, setGuideIndex] = useState(0);
+  const [guideTransitioning, setGuideTransitioning] = useState(false);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | undefined>();
   const [canvasInteractionLocked, setCanvasInteractionLocked] = useState(false);
   const [fineAdjustMode, setFineAdjustMode] = useState(false);
@@ -148,6 +151,7 @@ function AppShell() {
       }
 
       if (
+        targetId === "main-help" ||
         targetId === "phase-tabs" ||
         targetId === "view-mode-tabs" ||
         targetId === "participant-list" ||
@@ -307,6 +311,7 @@ function AppShell() {
       selectedMarkerId
     };
     guideAdvanceLockedRef.current = false;
+    setGuideTransitioning(false);
     setHelpOpen(false);
     setIntroOpen(false);
     setActiveGuideMode(mode);
@@ -338,11 +343,12 @@ function AppShell() {
     guideStateSnapshotRef.current = undefined;
     guideUiSnapshotRef.current = undefined;
     guideAdvanceLockedRef.current = false;
+    setGuideTransitioning(false);
     setActiveGuideMode(undefined);
     setGuideIndex(0);
   }
 
-  function scheduleNextGuideStep() {
+  function scheduleNextGuideStep(delayMs = GUIDE_ADVANCE_DELAY_MS) {
     if (guideAdvanceLockedRef.current) {
       return;
     }
@@ -351,7 +357,7 @@ function AppShell() {
     setTimeout(() => {
       guideAdvanceLockedRef.current = false;
       showNextGuideStep();
-    }, GUIDE_ADVANCE_DELAY_MS);
+    }, delayMs);
   }
 
   function completeGuideTarget(targetId: GuideStep["targetId"]) {
@@ -367,7 +373,7 @@ function AppShell() {
       return;
     }
 
-    scheduleNextGuideStep();
+    scheduleNextGuideStep(stepId === "member-nudge-marker" ? GUIDE_NUDGE_ADVANCE_DELAY_MS : GUIDE_ADVANCE_DELAY_MS);
   }
 
   function showNextGuideStep() {
@@ -377,12 +383,25 @@ function AppShell() {
       return;
     }
 
+    const nextStep = guideSteps[nextIndex];
+    const shouldDelay = nextStep?.screen !== currentGuideStep?.screen;
+    if (shouldDelay) {
+      setGuideTransitioning(true);
+      prepareGuideStep(nextStep);
+      setTimeout(() => {
+        setGuideIndex(nextIndex);
+        setGuideTransitioning(false);
+      }, GUIDE_SCREEN_TRANSITION_DELAY_MS);
+      return;
+    }
+
     setGuideIndex(nextIndex);
-    prepareGuideStep(guideSteps[nextIndex]);
+    prepareGuideStep(nextStep);
   }
 
   function showPreviousGuideStep() {
     guideAdvanceLockedRef.current = false;
+    setGuideTransitioning(false);
     const nextIndex = Math.max(0, guideIndex - 1);
     setGuideIndex(nextIndex);
     prepareGuideStep(guideSteps[nextIndex]);
@@ -411,7 +430,7 @@ function AppShell() {
 
   const renderGuideOverlay = (embedded = false) => (
     <GuideOverlay
-      visible={!!activeGuideMode}
+      visible={!!activeGuideMode && !guideTransitioning}
       step={currentGuideStep}
       stepIndex={guideIndex}
       stepCount={guideSteps.length}
@@ -732,6 +751,7 @@ function AppShell() {
         onClose={() => setDrawerOpen(false)}
         onGuideTargetPress={completeGuideTarget}
         guideOverlay={guideOverlayInSidebar ? embeddedGuideOverlay : undefined}
+        guideTargetId={currentGuideStep?.targetId}
       />
       <ParticipantManagerPanel
         visible={participantManagerOpen}

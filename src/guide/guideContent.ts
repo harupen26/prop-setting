@@ -8,7 +8,7 @@ export type GuideScreen =
   | "projectSettings"
   | "pdf";
 
-export type GuidePlacement = "top" | "bottom" | "center";
+export type GuidePlacement = "top" | "bottom" | "center" | "screen-top" | "screen-bottom";
 
 export type GuideTargetId =
   | "project-add"
@@ -189,17 +189,6 @@ export const memberGuideSteps: GuideStep[] = [
     targetActionLabel: "丸をドラッグしてください"
   },
   {
-    id: "member-step-toggle",
-    mode: "member",
-    screen: "main",
-    targetId: "marker-step-toggle",
-    title: "歩数を切り替える",
-    body: "1歩と0.5歩を切り替えます。",
-    placement: "top",
-    advanceOnTargetPress: true,
-    targetActionLabel: "1歩 / 0.5歩を押してください"
-  },
-  {
     id: "member-nudge-marker",
     mode: "member",
     screen: "main",
@@ -209,6 +198,17 @@ export const memberGuideSteps: GuideStep[] = [
     placement: "top",
     advanceOnTargetPress: true,
     targetActionLabel: "矢印を1回押してください"
+  },
+  {
+    id: "member-step-toggle",
+    mode: "member",
+    screen: "main",
+    targetId: "marker-step-toggle",
+    title: "0.5歩に切り替える",
+    body: "細かく動かしたい時は0.5歩にできます。",
+    placement: "top",
+    advanceOnTargetPress: true,
+    targetActionLabel: "1歩 / 0.5歩を押してください"
   },
   {
     id: "member-phase",
@@ -225,9 +225,10 @@ export const memberGuideSteps: GuideStep[] = [
     id: "member-finished",
     mode: "member",
     screen: "main",
+    targetId: "main-help",
     title: "チュートリアル完了",
-    body: "これで完了です。迷ったら？から見直せます。",
-    placement: "center"
+    body: "迷ったら上の？ボタンから見直せます。",
+    placement: "bottom"
   }
 ];
 
@@ -248,7 +249,7 @@ export const adminGuideSteps: GuideStep[] = [
     targetId: "project-open",
     title: "プロジェクトを開く",
     body: "プロジェクトを開きます。",
-    placement: "bottom",
+    placement: "screen-bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "「開く」を押してください"
   },
@@ -288,7 +289,7 @@ export const adminGuideSteps: GuideStep[] = [
     targetId: "participant-manager-add",
     title: "参加者を追加",
     body: "名前を入力して追加します。",
-    placement: "top"
+    placement: "screen-top"
   },
   {
     id: "admin-role-select",
@@ -308,7 +309,7 @@ export const adminGuideSteps: GuideStep[] = [
     targetId: "sidebar-add-role",
     title: "手具を追加",
     body: "名前、色、フォルダーを設定します。",
-    placement: "top"
+    placement: "screen-top"
   },
   {
     id: "admin-role-visibility",
