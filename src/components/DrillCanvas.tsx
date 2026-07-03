@@ -3,7 +3,7 @@ import { PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
 import { Minus, Plus } from "lucide-react-native";
 import Svg, { Circle, G, Line, Rect, Text as SvgText } from "react-native-svg";
 
-import type { ApparatusRole, Marker, Participant, Phase } from "../types";
+import type { ApparatusRole, Marker, Participant, Phase, RoleFolder } from "../types";
 import {
   DRILL_GUIDES,
   SNAP,
@@ -43,6 +43,7 @@ type PinchGesture = {
 type Props = {
   phase: Phase;
   markers: Marker[];
+  folders: RoleFolder[];
   roles: ApparatusRole[];
   participants: Participant[];
   selectedMarkerId?: string;
@@ -63,6 +64,7 @@ const ZOOM_LEVELS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
 export function DrillCanvas({
   phase,
   markers,
+  folders,
   roles,
   participants,
   selectedMarkerId,
@@ -83,19 +85,23 @@ export function DrillCanvas({
   const displayHeight = height * zoom;
   const markerRadius = getMarkerRadius(viewportWidth);
   const size = useMemo(() => ({ width: viewportWidth, height }), [height, viewportWidth]);
-  const overlap = useMemo(() => buildOverlapMap(markers), [markers]);
+  const overlap = useMemo(() => buildOverlapMap(markers, { folders, roles }), [folders, markers, roles]);
+  const overlapStepPx = useMemo(
+    () => ({ x: snapXToCanvas(1, viewportWidth), y: snapYToCanvas(1, height) }),
+    [height, viewportWidth]
+  );
   const markerViews = useMemo(
     () =>
       markers.map((marker) => {
         const base = snapToCoordinate(marker, size);
-        const offset = getOverlapOffset(marker, overlap[marker.id], markerRadius);
+        const offset = getOverlapOffset(marker, overlap[marker.id], overlapStepPx);
         return {
           marker,
           x: base.x + offset.dx,
           y: base.y + offset.dy
         };
       }),
-    [markerRadius, markers, overlap, size]
+    [markers, overlap, overlapStepPx, size]
   );
   const markerViewsRef = useRef<MarkerView[]>(markerViews);
   const sizeRef = useRef(size);

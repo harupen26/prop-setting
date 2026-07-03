@@ -650,6 +650,7 @@ function AppShell() {
           <DrillCanvas
             phase={state.activePhase}
             markers={visibleMarkers}
+            folders={state.folders}
             roles={state.roles}
             participants={state.participants}
             selectedMarkerId={selectedMarkerId}

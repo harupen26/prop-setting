@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { coordinateToSnap, getOverlapOffset } from "./grid";
+import { buildOverlapMap, coordinateToSnap, getOverlapOffset } from "./grid";
 import { deriveMarkerLabelFromName, formatMarkerLabel } from "./labels";
 import { replaceParticipantMarkers } from "./merge";
 import { initialAppState } from "../data/seed";
@@ -48,9 +48,54 @@ describe("丸内ラベル", () => {
 
 describe("重なり表示", () => {
   it("2つ目以降を中心から外向きにずらす", () => {
-    const offset = getOverlapOffset({ xSnap: 120, ySnap: 64 }, { index: 1, count: 2 }, 10);
-    expect(offset.dx).toBeGreaterThan(0);
-    expect(Math.abs(offset.dy)).toBeLessThan(0.001);
+    const step = { x: 5, y: 7 };
+
+    expect(getOverlapOffset({ xSnap: 80, ySnap: 20 }, { index: 1, count: 2 }, step)).toEqual({
+      dx: 0,
+      dy: -7
+    });
+    expect(getOverlapOffset({ xSnap: 80, ySnap: 100 }, { index: 2, count: 3 }, step)).toEqual({
+      dx: 0,
+      dy: 14
+    });
+    expect(getOverlapOffset({ xSnap: 20, ySnap: 64 }, { index: 1, count: 2 }, step)).toEqual({
+      dx: -5,
+      dy: 0
+    });
+    expect(getOverlapOffset({ xSnap: 140, ySnap: 64 }, { index: 1, count: 2 }, step)).toEqual({
+      dx: 5,
+      dy: 0
+    });
+  });
+
+  it("手具フォルダの上から順に正規位置に残す", () => {
+    const laterMarker = { ...marker("later-marker", "participant-a", 40), roleId: "role-late" };
+    const earlyMarker = { ...marker("early-marker", "participant-b", 40), roleId: "role-early" };
+
+    const overlap = buildOverlapMap([laterMarker, earlyMarker], {
+      folders: [{ id: "folder-m1", name: "M1", order: 1, visible: true, collapsed: false }],
+      roles: [
+        {
+          id: "role-late",
+          folderId: "folder-m1",
+          name: "Late",
+          color: "#0f172a",
+          order: 2,
+          visible: true
+        },
+        {
+          id: "role-early",
+          folderId: "folder-m1",
+          name: "Early",
+          color: "#0f766e",
+          order: 1,
+          visible: true
+        }
+      ]
+    });
+
+    expect(overlap["early-marker"].index).toBe(0);
+    expect(overlap["later-marker"].index).toBe(1);
   });
 });
 

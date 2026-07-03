@@ -95,7 +95,7 @@ export function buildDrillSheetSvg(
       participantIds.includes(marker.participantId) &&
       isRoleVisible(state, marker.roleId)
   );
-  const overlap = buildOverlapMap(markers);
+  const overlap = buildOverlapMap(markers, { folders: state.folders, roles: state.roles });
   const gridLines = buildGridLines();
   const markerNodes = markers
     .map((marker) => buildMarkerNode(state, marker, overlap[marker.id]))
@@ -238,7 +238,10 @@ function buildMarkerNode(
   }
 
   const base = snapToCoordinate(marker, { width: DRILL_WIDTH, height: DRILL_HEIGHT });
-  const offset = getOverlapOffset(marker, overlap, MARKER_RADIUS);
+  const offset = getOverlapOffset(marker, overlap, {
+    x: DRILL_WIDTH / SNAP.xMax,
+    y: DRILL_HEIGHT / SNAP.yMax
+  });
   const x = base.x + offset.dx;
   const y = base.y + offset.dy;
   const lines = formatMarkerLabel(participant.markerLabel);

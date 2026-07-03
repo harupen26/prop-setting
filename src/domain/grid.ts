@@ -1,4 +1,4 @@
-import type { Marker, Phase } from "../types";
+import type { ApparatusRole, Marker, Phase, RoleFolder } from "../types";
 
 export const FIELD_METERS = {
   width: 50,
@@ -57,6 +57,16 @@ export type OverlapInfo = {
   count: number;
 };
 
+export type OverlapSortContext = {
+  folders?: RoleFolder[];
+  roles?: ApparatusRole[];
+};
+
+export type OverlapStepPx = {
+  x: number;
+  y: number;
+};
+
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -79,8 +89,13 @@ export function getPhaseLabel(phase: Phase): string {
   return phase === "entry" ? "入場" : "退場";
 }
 
-export function buildOverlapMap(markers: Marker[]): Record<string, OverlapInfo> {
+export function buildOverlapMap(
+  markers: Marker[],
+  sortContext: OverlapSortContext = {}
+): Record<string, OverlapInfo> {
   const grouped = new Map<string, Marker[]>();
+  const roleOrderMap = buildRoleOrderMap(sortContext);
+  const markerOrderMap = new Map(markers.map((marker, index) => [marker.id, index]));
 
   for (const marker of markers) {
     const key = `${marker.phase}:${marker.xSnap}:${marker.ySnap}`;
@@ -92,7 +107,9 @@ export function buildOverlapMap(markers: Marker[]): Record<string, OverlapInfo> 
   const result: Record<string, OverlapInfo> = {};
 
   grouped.forEach((list) => {
-    const sorted = [...list].sort((a, b) => a.id.localeCompare(b.id));
+    const sorted = [...list].sort((a, b) =>
+      compareOverlapMarkers(a, b, roleOrderMap, markerOrderMap)
+    );
     sorted.forEach((marker, index) => {
       result[marker.id] = { index, count: sorted.length };
     });
@@ -104,7 +121,7 @@ export function buildOverlapMap(markers: Marker[]): Record<string, OverlapInfo> 
 export function getOverlapOffset(
   point: SnapPoint,
   overlap: OverlapInfo | undefined,
-  radiusPx: number
+  stepPx: OverlapStepPx
 ): { dx: number; dy: number } {
   if (!overlap || overlap.count <= 1 || overlap.index === 0) {
     return { dx: 0, dy: 0 };
@@ -112,15 +129,58 @@ export function getOverlapOffset(
 
   const vectorX = point.xSnap - SNAP.xMax / 2;
   const vectorY = point.ySnap - SNAP.yMax / 2;
-  const length = Math.hypot(vectorX, vectorY) || 1;
-  const unitX = length < 1 ? 0 : vectorX / length;
-  const unitY = length < 1 ? -1 : vectorY / length;
-  const distance = overlap.index * radiusPx * 1.35;
+  const moveHorizontally = Math.abs(vectorX) > Math.abs(vectorY);
+
+  if (moveHorizontally) {
+    return {
+      dx: (vectorX > 0 ? 1 : -1) * overlap.index * stepPx.x,
+      dy: 0
+    };
+  }
 
   return {
-    dx: unitX * distance,
-    dy: unitY * distance
+    dx: 0,
+    dy: (vectorY > 0 ? 1 : -1) * overlap.index * stepPx.y
   };
+}
+
+function buildRoleOrderMap(sortContext: OverlapSortContext): Map<string, number> {
+  const folderOrder = new Map(
+    (sortContext.folders ?? []).map((folder, index) => [folder.id, folder.order * 1000 + index])
+  );
+  const roles = [...(sortContext.roles ?? [])].sort((a, b) => {
+    const folderA = folderOrder.get(a.folderId) ?? Number.MAX_SAFE_INTEGER;
+    const folderB = folderOrder.get(b.folderId) ?? Number.MAX_SAFE_INTEGER;
+
+    if (folderA !== folderB) {
+      return folderA - folderB;
+    }
+
+    if (a.order !== b.order) {
+      return a.order - b.order;
+    }
+
+    const nameCompare = a.name.localeCompare(b.name);
+    return nameCompare || a.id.localeCompare(b.id);
+  });
+
+  return new Map(roles.map((role, index) => [role.id, index]));
+}
+
+function compareOverlapMarkers(
+  a: Marker,
+  b: Marker,
+  roleOrderMap: Map<string, number>,
+  markerOrderMap: Map<string, number>
+): number {
+  const roleOrderA = roleOrderMap.get(a.roleId) ?? Number.MAX_SAFE_INTEGER;
+  const roleOrderB = roleOrderMap.get(b.roleId) ?? Number.MAX_SAFE_INTEGER;
+
+  if (roleOrderA !== roleOrderB) {
+    return roleOrderA - roleOrderB;
+  }
+
+  return (markerOrderMap.get(a.id) ?? 0) - (markerOrderMap.get(b.id) ?? 0);
 }
 
 export function getCenterRectSnapBounds(): {
