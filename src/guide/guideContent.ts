@@ -63,7 +63,7 @@ export const memberGuideSteps: GuideStep[] = [
     mode: "member",
     screen: "projectList",
     title: "ホーム画面に追加",
-    body: "iPhone / iPadはSafariの共有ボタンから、AndroidはChromeのメニューからホーム画面に追加できます。",
+    body: "SafariやChromeからホーム画面に追加できます。",
     placement: "center"
   },
   {
@@ -72,9 +72,10 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-add",
     title: "プロジェクトに参加",
-    body: "右下の＋から、招待IDで参加できます。まず＋を押して参加画面を開きます。",
+    body: "右下の＋を押します。",
+    placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "右下の＋を押してください"
+    targetActionLabel: "＋を押してください"
   },
   {
     id: "member-project-action-mode",
@@ -82,7 +83,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-action-mode",
     title: "招待IDで参加を選ぶ",
-    body: "プロジェクト追加では「作成」と「参加」を選べます。今回は参加を押します。",
+    body: "今回は「参加」を選びます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "「参加」を押してください"
   },
@@ -92,7 +94,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-join-invite-input",
     title: "招待IDを入力",
-    body: "サンプル招待IDとして YR-2026 を入力します。入力しても最後に元へ戻ります。",
+    body: "YR-2026 と入力します。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "YR-2026 と入力してください"
   },
@@ -102,7 +105,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-join-submit",
     title: "プロジェクトに参加",
-    body: "参加ボタンを押すと、既存のサンプルプロジェクトを開いて練習を始めます。",
+    body: "参加を押して開きます。",
+    placement: "top",
     advanceOnTargetPress: true,
     targetActionLabel: "「参加」を押してください"
   },
@@ -112,7 +116,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "participant-list",
     title: "自分の名前を選ぶ",
-    body: "ここから自分の名前を選びます。今は練習なので、どの名前を押しても最後に元へ戻ります。",
+    body: "自分の名前を押します。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "名前を1つ押してください"
   },
@@ -122,7 +127,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "role-select",
     title: "手具画面を開く",
-    body: "「変更」を押して、置く手具を選ぶ画面を開いてみましょう。",
+    body: "「変更」で手具を選びます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "「変更」を押してください"
   },
@@ -132,7 +138,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "sidebar",
     targetId: "sidebar-role-list",
     title: "置く手具を選ぶ",
-    body: "手具を1つ押すと選択できます。選んだ手具が次にドリルへ置かれます。",
+    body: "手具を1つ押します。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "手具を1つ押してください"
   },
@@ -142,7 +149,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "drill-canvas",
     title: "ドリルに配置",
-    body: "ドリルをタップして丸を置いてみましょう。チュートリアル終了時にこの練習配置は消えます。",
+    body: "ドリルをタップして丸を置きます。",
+    placement: "top",
     advanceOnTargetPress: true,
     targetActionLabel: "ドリルをタップしてください"
   },
@@ -152,7 +160,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "drill-zoom-buttons",
     title: "ボタンで拡大縮小",
-    body: "＋と−でドリルシートを拡大縮小できます。ドラッグしづらい時は、まずボタンで倍率を調整します。",
+    body: "＋と−で大きさを変えます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "＋か−を押してください"
   },
@@ -162,7 +171,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "drill-canvas",
     title: "指で拡大縮小",
-    body: "スマホでは二本指のピンチアウト / ピンチインでも拡大縮小できます。",
+    body: "二本指でも大きさを変えられます。",
+    placement: "top",
     advanceOnTargetPress: true,
     targetActionLabel: "二本指で拡大縮小してください"
   },
@@ -172,7 +182,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "drill-canvas",
     title: "丸をドラッグで移動",
-    body: "置いた丸を指でドラッグすると移動できます。位置は格子に吸着します。",
+    body: "丸を指で動かします。",
+    placement: "top",
     advanceOnTargetPress: true,
     targetActionLabel: "丸をドラッグしてください"
   },
@@ -182,7 +193,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "marker-nudge-controls",
     title: "矢印で細かく調整",
-    body: "ドラッグが難しい時は、丸を選んだ状態で矢印ボタンを押して位置を調整できます。",
+    body: "矢印で少しずつ動かせます。",
+    placement: "top",
     advanceOnTargetPress: true,
     targetActionLabel: "矢印を1回押してください"
   },
@@ -192,7 +204,8 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "phase-tabs",
     title: "入場と退場を切り替える",
-    body: "入場と退場は別々に入力します。タブを押して切り替えを試したら完了です。",
+    body: "入場と退場を切り替えます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "入場 / 退場を押してください"
   },
@@ -201,7 +214,7 @@ export const memberGuideSteps: GuideStep[] = [
     mode: "member",
     screen: "main",
     title: "チュートリアル完了",
-    body: "これでチュートリアルは以上です。操作方法でわからないことがあれば、画面上の？ボタンからいつでも見直せます。",
+    body: "これで完了です。迷ったら？から見直せます。",
     placement: "center"
   }
 ];
@@ -213,7 +226,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-add",
     title: "プロジェクト作成",
-    body: "右下の＋からプロジェクトを作成します。招待IDは自分で設定するか自動作成できます。"
+    body: "右下の＋から作成します。",
+    placement: "top"
   },
   {
     id: "admin-project-open",
@@ -221,7 +235,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-open",
     title: "プロジェクトを開く",
-    body: "プロジェクトを開いて、参加者・手具・シートを管理する画面に入ってみましょう。",
+    body: "プロジェクトを開きます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "「開く」を押してください"
   },
@@ -231,7 +246,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "participant-manager-button",
     title: "参加者管理",
-    body: "人型アイコンから参加者管理を開きます。実際に押して画面を開いてみましょう。",
+    body: "人型アイコンを押します。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "人型アイコンを押してください"
   },
@@ -241,7 +257,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "participantManager",
     targetId: "participant-manager-invite",
     title: "招待IDを共有",
-    body: "招待IDや招待リンクをコピーしてメンバーに共有します。"
+    body: "招待IDをコピーして共有します。",
+    placement: "bottom"
   },
   {
     id: "admin-participants",
@@ -249,7 +266,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "participantManager",
     targetId: "participant-manager-list",
     title: "参加者を整える",
-    body: "参加者名、丸の中に出す文字、削除をここで管理します。削除時は確認が入ります。"
+    body: "名前、丸の文字、削除を管理します。",
+    placement: "bottom"
   },
   {
     id: "admin-add-participant",
@@ -257,7 +275,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "participantManager",
     targetId: "participant-manager-add",
     title: "参加者を追加",
-    body: "新しい参加者名を入力して追加できます。"
+    body: "名前を入力して追加します。",
+    placement: "top"
   },
   {
     id: "admin-role-select",
@@ -265,7 +284,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "role-select",
     title: "手具を管理",
-    body: "「変更」から手具画面を開き、手具の選択や追加を行います。実際に開いてみましょう。",
+    body: "「変更」で手具画面を開きます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "「変更」を押してください"
   },
@@ -275,7 +295,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "sidebar",
     targetId: "sidebar-add-role",
     title: "手具を追加",
-    body: "手具名、色、フォルダーを設定して追加します。自由色もここから選べます。"
+    body: "名前、色、フォルダーを設定します。",
+    placement: "top"
   },
   {
     id: "admin-role-visibility",
@@ -283,7 +304,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "sidebar",
     targetId: "sidebar-role-list",
     title: "表示 / 非表示を切り替える",
-    body: "手具やフォルダーの目アイコンを押すと、ドリル上に表示するかどうかを切り替えられます。"
+    body: "目アイコンで表示を切り替えます。",
+    placement: "bottom"
   },
   {
     id: "admin-integrated",
@@ -291,7 +313,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "view-mode-tabs",
     title: "統合表示",
-    body: "統合表示に切り替えると、全員分の丸を重ねて確認できます。タブを押して切り替えてみましょう。",
+    body: "全員分を重ねて見ます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "統合表示を押してください"
   },
@@ -301,7 +324,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "pdf-button",
     title: "PDF出力",
-    body: "PDFアイコンから印刷用の出力設定を開きます。実際に押して設定画面を見てみましょう。",
+    body: "PDF設定を開きます。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "PDFアイコンを押してください"
   },
@@ -311,7 +335,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "pdf",
     targetId: "pdf-target",
     title: "出力対象を選ぶ",
-    body: "統合表示か参加者別、入場か退場か両方かを選んで保存します。"
+    body: "誰のシートを出すか選びます。",
+    placement: "bottom"
   },
   {
     id: "admin-settings",
@@ -319,7 +344,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "project-settings-button",
     title: "プロジェクト設定",
-    body: "歯車アイコンから、プロジェクト名やシートのバージョンを管理します。実際に開いてみましょう。",
+    body: "歯車アイコンを押します。",
+    placement: "bottom",
     advanceOnTargetPress: true,
     targetActionLabel: "歯車アイコンを押してください"
   },
@@ -329,7 +355,8 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "projectSettings",
     targetId: "project-settings-duplicate",
     title: "シートを更新版にする",
-    body: "県大会、関東大会、全国大会のようにコピー作成してアップデートできます。不要な更新版は削除できます。"
+    body: "大会ごとにコピーして更新できます。",
+    placement: "bottom"
   }
 ];
 

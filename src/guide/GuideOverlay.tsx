@@ -16,6 +16,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle
 } from "react-native";
@@ -40,9 +41,11 @@ const GuideContext = createContext<GuideRegistry | undefined>(undefined);
 
 const OVERLAY_COLOR = "rgba(15, 23, 42, 0.62)";
 const TARGET_PADDING = 7;
-const BUBBLE_MARGIN = 14;
-const BUBBLE_WIDTH = 318;
-const ESTIMATED_BUBBLE_HEIGHT = 210;
+const BUBBLE_MARGIN = 10;
+const BUBBLE_GAP = 10;
+const BUBBLE_WIDTH = 304;
+const ESTIMATED_BUBBLE_HEIGHT = 178;
+const ACTION_FALLBACK_DELAY_MS = 4200;
 
 export function GuideProvider({ children }: { children: ReactNode }) {
   const targetsRef = useRef(new Map<GuideTargetId, RefObject<View | null>>());
@@ -147,6 +150,10 @@ export function GuideOverlay({
   const registryRevision = registry?.revision;
   const dimensions = useWindowDimensions();
   const [targetLayout, setTargetLayout] = useState<TargetLayout | undefined>();
+  const [bubbleHeight, setBubbleHeight] = useState(ESTIMATED_BUBBLE_HEIGHT);
+  const [actionFallbackVisible, setActionFallbackVisible] = useState(false);
+  const stepId = step?.id;
+  const waitsForTargetAction = !!step?.advanceOnTargetPress && !!step.targetId;
 
   useEffect(() => {
     let cancelled = false;
@@ -173,13 +180,37 @@ export function GuideOverlay({
     };
   }, [measureTarget, registryRevision, step?.targetId, visible]);
 
+  useEffect(() => {
+    setBubbleHeight(ESTIMATED_BUBBLE_HEIGHT);
+    setActionFallbackVisible(false);
+
+    if (!visible || !waitsForTargetAction) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setActionFallbackVisible(true);
+    }, ACTION_FALLBACK_DELAY_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [stepId, visible, waitsForTargetAction]);
+
   if (!step) {
     return null;
   }
 
-  const bubbleStyle = getBubbleStyle(targetLayout, dimensions.width, dimensions.height, step.placement);
+  const bubbleStyle = getBubbleStyle(targetLayout, dimensions.width, dimensions.height, step.placement, bubbleHeight);
   const finalStep = stepIndex >= stepCount - 1;
-  const waitsForTargetAction = !!step.advanceOnTargetPress && !!step.targetId;
+  const showPrimaryButton = !waitsForTargetAction || actionFallbackVisible;
+  const primaryButtonLabel = waitsForTargetAction ? "できない時は次へ" : finalStep ? "完了" : "次へ";
+  const handleBubbleLayout = (event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    if (Math.abs(nextHeight - bubbleHeight) > 2) {
+      setBubbleHeight(nextHeight);
+    }
+  };
   const content = (
     <View style={waitsForTargetAction ? styles.floatingOverlay : styles.overlay} pointerEvents={waitsForTargetAction ? "box-none" : "auto"}>
       <OverlayScrim
@@ -189,7 +220,7 @@ export function GuideOverlay({
         allowTargetPress={waitsForTargetAction}
       />
       {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
-      <View style={[styles.bubble, bubbleStyle]}>
+      <View style={[styles.bubble, bubbleStyle]} onLayout={handleBubbleLayout}>
         <View style={styles.bubbleTop}>
           <Text style={styles.progress}>
             {stepIndex + 1} / {stepCount}
@@ -219,9 +250,9 @@ export function GuideOverlay({
                 <Text style={styles.secondaryButtonText}>戻る</Text>
               </Pressable>
             ) : null}
-            {!waitsForTargetAction ? (
-              <Pressable style={styles.primaryButton} onPress={onNext}>
-                <Text style={styles.primaryButtonText}>{finalStep ? "完了" : "次へ"}</Text>
+            {showPrimaryButton ? (
+              <Pressable style={[styles.primaryButton, waitsForTargetAction ? styles.fallbackNextButton : null]} onPress={onNext}>
+                <Text style={styles.primaryButtonText}>{primaryButtonLabel}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -312,41 +343,58 @@ function getBubbleStyle(
   layout: TargetLayout | undefined,
   screenWidth: number,
   screenHeight: number,
-  placement: GuideStep["placement"]
+  placement: GuideStep["placement"],
+  measuredBubbleHeight: number
 ): ViewStyle {
   const width = Math.min(BUBBLE_WIDTH, screenWidth - BUBBLE_MARGIN * 2);
+  const bubbleHeight = Math.max(120, measuredBubbleHeight || ESTIMATED_BUBBLE_HEIGHT);
+  const maxTop = Math.max(BUBBLE_MARGIN, screenHeight - bubbleHeight - BUBBLE_MARGIN);
+  const maxHeight = Math.max(140, screenHeight - BUBBLE_MARGIN * 2);
 
   if (!layout || placement === "center") {
     return {
       left: (screenWidth - width) / 2,
-      top: Math.max(BUBBLE_MARGIN, (screenHeight - ESTIMATED_BUBBLE_HEIGHT) / 2),
-      width
+      top: clamp((screenHeight - bubbleHeight) / 2, BUBBLE_MARGIN, maxTop),
+      width,
+      maxHeight
     };
   }
 
   const target = expandLayout(layout);
-  const preferredTop = placement === "top" ? target.y - ESTIMATED_BUBBLE_HEIGHT - 12 : target.y + target.height + 12;
-  const hasBottomSpace = target.y + target.height + ESTIMATED_BUBBLE_HEIGHT + 24 < screenHeight;
-  const hasTopSpace = target.y - ESTIMATED_BUBBLE_HEIGHT - 12 > BUBBLE_MARGIN;
+  const aboveTop = target.y - bubbleHeight - BUBBLE_GAP;
+  const belowTop = target.y + target.height + BUBBLE_GAP;
+  const topSpace = target.y - BUBBLE_MARGIN - BUBBLE_GAP;
+  const bottomSpace = screenHeight - (target.y + target.height) - BUBBLE_MARGIN - BUBBLE_GAP;
+  const canFitAbove = topSpace >= bubbleHeight;
+  const canFitBelow = bottomSpace >= bubbleHeight;
+  const preferTop = placement === "top";
+  const preferBottom = placement === "bottom" || !placement;
   const top =
-    placement === "top" && hasTopSpace
-      ? preferredTop
-      : placement === "bottom" && hasBottomSpace
-        ? preferredTop
-        : hasBottomSpace
-          ? target.y + target.height + 12
-          : hasTopSpace
-            ? target.y - ESTIMATED_BUBBLE_HEIGHT - 12
-            : Math.max(BUBBLE_MARGIN, screenHeight - ESTIMATED_BUBBLE_HEIGHT - BUBBLE_MARGIN);
+    preferTop && canFitAbove
+      ? aboveTop
+      : preferBottom && canFitBelow
+        ? belowTop
+        : canFitAbove
+          ? aboveTop
+          : canFitBelow
+            ? belowTop
+            : bottomSpace >= topSpace
+              ? clamp(belowTop, BUBBLE_MARGIN, maxTop)
+              : clamp(aboveTop, BUBBLE_MARGIN, maxTop);
 
   return {
     left: clamp(target.x + target.width / 2 - width / 2, BUBBLE_MARGIN, screenWidth - width - BUBBLE_MARGIN),
     top,
-    width
+    width,
+    maxHeight
   };
 }
 
 function clamp(value: number, min: number, max: number): number {
+  if (max < min) {
+    return min;
+  }
+
   return Math.min(Math.max(value, min), max);
 }
 
@@ -372,8 +420,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.22)",
-    padding: 16,
-    gap: 8,
+    padding: 14,
+    gap: 7,
     backgroundColor: colors.surface
   },
   bubbleTop: {
@@ -400,13 +448,13 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "900"
   },
   body: {
     color: colors.text,
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 18,
     fontWeight: "700"
   },
   fallbackText: {
@@ -432,7 +480,7 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   actions: {
-    marginTop: 8,
+    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -475,6 +523,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primary
+  },
+  fallbackNextButton: {
+    paddingHorizontal: 12,
+    backgroundColor: colors.text
   },
   primaryButtonText: {
     color: "#ffffff",
