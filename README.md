@@ -9,6 +9,10 @@ pnpm install
 pnpm start
 ```
 
+## 使い方ガイド
+
+初めて使うメンバー・管理者向けの説明は[docs/user-guide.md](docs/user-guide.md)にあります。
+
 ## PWAとして公開
 
 本番用のWeb/PWAを書き出します。
