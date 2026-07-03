@@ -1,4 +1,4 @@
-const CACHE_VERSION = "props-setting-pwa-v11";
+const CACHE_VERSION = "props-setting-pwa-v12";
 const CORE_ASSETS = [
   "/",
   "/index.html",

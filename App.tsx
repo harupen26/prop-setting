@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -88,6 +89,7 @@ export default function App() {
 }
 
 function AppShell() {
+  const { width } = useWindowDimensions();
   const { state, dispatch, hydrated } = usePersistentState();
   const { preferences, guideHydrated, markIntroSeen, markGuideCompleted } = useGuidePreferences();
   const guideStateSnapshotRef = useRef<AppState | undefined>(undefined);
@@ -116,6 +118,8 @@ function AppShell() {
   const activeParticipant = getActiveParticipant(state);
   const selectedRole = getSelectedRole(state);
   const visibleMarkers = getVisibleMarkers(state);
+  const compactHeader = width < 430;
+  const headerIconSize = compactHeader ? 18 : 20;
   const visibleRoleCount = useMemo(
     () => state.roles.filter((role) => isRoleVisible(state, role.id)).length,
     [state]
@@ -494,53 +498,59 @@ function AppShell() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.appName} numberOfLines={1}>手具セット管理</Text>
-          <Text style={styles.appMeta} numberOfLines={1}>
+      <View style={[styles.header, compactHeader && styles.headerCompact]}>
+        <View style={[styles.headerText, compactHeader && styles.headerTextCompact]}>
+          <Text style={[styles.appName, compactHeader && styles.appNameCompact]} numberOfLines={1}>
+            手具セット管理
+          </Text>
+          <Text style={[styles.appMeta, compactHeader && styles.appMetaCompact]} numberOfLines={1}>
             {activeProject?.name ?? "プロジェクト未設定"} / {activeCompetition?.name ?? "シート未設定"} / {activeParticipant.name}
           </Text>
         </View>
-        <View style={styles.headerActions}>
+        <View style={[styles.headerActions, compactHeader && styles.headerActionsCompact]}>
           <GuideTarget targetId="main-help">
-            <Pressable accessibilityLabel="使い方ガイドを開く" style={styles.iconButton} onPress={() => setHelpOpen(true)}>
-              <HelpCircle size={20} color={colors.text} />
+            <Pressable
+              accessibilityLabel="使い方ガイドを開く"
+              style={[styles.iconButton, compactHeader && styles.iconButtonCompact]}
+              onPress={() => setHelpOpen(true)}
+            >
+              <HelpCircle size={headerIconSize} color={colors.text} />
             </Pressable>
           </GuideTarget>
           <GuideTarget targetId="participant-manager-button">
             <Pressable
               accessibilityLabel="参加者管理を開く"
-              style={styles.iconButton}
+              style={[styles.iconButton, compactHeader && styles.iconButtonCompact]}
               onPress={() => {
                 setParticipantManagerOpen(true);
                 completeGuideTarget("participant-manager-button");
               }}
             >
-              <Users size={20} color={colors.text} />
+              <Users size={headerIconSize} color={colors.text} />
             </Pressable>
           </GuideTarget>
           <GuideTarget targetId="pdf-button">
             <Pressable
               accessibilityLabel="PDF出力"
-              style={styles.iconButton}
+              style={[styles.iconButton, compactHeader && styles.iconButtonCompact]}
               onPress={() => {
                 openPdfOptions();
                 completeGuideTarget("pdf-button");
               }}
             >
-              <FileDown size={20} color={colors.text} />
+              <FileDown size={headerIconSize} color={colors.text} />
             </Pressable>
           </GuideTarget>
           <GuideTarget targetId="project-settings-button">
             <Pressable
               accessibilityLabel="プロジェクト設定を開く"
-              style={styles.iconButton}
+              style={[styles.iconButton, compactHeader && styles.iconButtonCompact]}
               onPress={() => {
                 setProjectSettingsOpen(true);
                 completeGuideTarget("project-settings-button");
               }}
             >
-              <Settings size={20} color={colors.text} />
+              <Settings size={headerIconSize} color={colors.text} />
             </Pressable>
           </GuideTarget>
         </View>
@@ -1571,24 +1581,44 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: colors.surface
   },
+  headerCompact: {
+    minHeight: 58,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
   headerText: {
     flex: 1,
+    minWidth: 0,
+    marginRight: 10,
     gap: 3
+  },
+  headerTextCompact: {
+    marginRight: 6,
+    gap: 2
   },
   appName: {
     color: colors.text,
     fontSize: 21,
     fontWeight: "900"
   },
+  appNameCompact: {
+    fontSize: 17
+  },
   appMeta: {
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: "600"
   },
+  appMetaCompact: {
+    fontSize: 10
+  },
   headerActions: {
     flexDirection: "row",
     flexShrink: 0,
     gap: 8
+  },
+  headerActionsCompact: {
+    gap: 4
   },
   iconButton: {
     width: 42,
@@ -1748,6 +1778,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surface
+  },
+  iconButtonCompact: {
+    width: 36,
+    height: 36,
+    borderRadius: 18
   },
   fineToggleActive: {
     backgroundColor: colors.text,

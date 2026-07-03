@@ -74,65 +74,65 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-add",
     title: "プロジェクトに参加",
-    body: "右下の＋を押します。",
+    body: "追加メニューを開きます。",
     placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "＋を押してください"
+    targetActionLabel: "＋をタップ"
   },
   {
     id: "member-project-action-mode",
     mode: "member",
     screen: "projectList",
     targetId: "project-action-mode",
-    title: "招待IDで参加を選ぶ",
-    body: "今回は「参加」を選びます。",
+    title: "参加方法",
+    body: "招待IDで入ります。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "「参加」を押してください"
+    targetActionLabel: "参加をタップ"
   },
   {
     id: "member-project-join-input",
     mode: "member",
     screen: "projectList",
     targetId: "project-join-invite-input",
-    title: "招待IDを入力",
-    body: "YRCG2025 と入力します。",
+    title: "招待ID",
+    body: "サンプルIDを入力します。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "YRCG2025 と入力してください"
+    targetActionLabel: "YRCG2025 と入力"
   },
   {
     id: "member-project-join-submit",
     mode: "member",
     screen: "projectList",
     targetId: "project-join-submit",
-    title: "プロジェクトに参加",
-    body: "参加を押して開きます。",
+    title: "参加する",
+    body: "入力したIDで開きます。",
     placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "「参加」を押してください"
+    targetActionLabel: "参加をタップ"
   },
   {
     id: "member-participant",
     mode: "member",
     screen: "main",
     targetId: "participant-list",
-    title: "自分の名前を選ぶ",
-    body: "自分の名前を押します。",
+    title: "名前を選ぶ",
+    body: "自分のシートに切り替えます。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "名前を1つ押してください"
+    targetActionLabel: "自分の名前をタップ"
   },
   {
     id: "member-role",
     mode: "member",
     screen: "main",
     targetId: "role-select",
-    title: "手具画面を開く",
-    body: "「変更」で手具を選びます。",
+    title: "手具を選ぶ",
+    body: "手具リストを開きます。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "「変更」を押してください"
+    targetActionLabel: "変更をタップ"
   },
   {
     id: "member-role-pick",
@@ -140,21 +140,21 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "sidebar",
     targetId: "sidebar-role-list",
     title: "置く手具を選ぶ",
-    body: "手具を1つ押します。",
+    body: "置きたい手具にします。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "手具を1つ押してください"
+    targetActionLabel: "手具をタップ"
   },
   {
     id: "member-drill",
     mode: "member",
     screen: "main",
     targetId: "drill-canvas",
-    title: "ドリルに配置",
-    body: "ドリルをタップして丸を置きます。",
+    title: "配置する",
+    body: "ドリル上に丸を置きます。",
     placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "ドリルをタップしてください"
+    targetActionLabel: "ドリルをタップ"
   },
   {
     id: "member-zoom-buttons",
@@ -162,54 +162,54 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "drill-zoom-buttons",
     title: "ボタンで拡大縮小",
-    body: "＋と−で大きさを変えます。",
+    body: "ボタンでも大きさを変えられます。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "＋か−を押してください"
+    targetActionLabel: "＋または−をタップ"
   },
   {
     id: "member-zoom-gesture",
     mode: "member",
     screen: "main",
     targetId: "drill-canvas",
-    title: "指で拡大縮小",
-    body: "二本指でも大きさを変えられます。",
+    title: "二本指で拡大縮小",
+    body: "指でも大きさを変えられます。",
     placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "二本指で拡大縮小してください"
+    targetActionLabel: "二本指で操作"
   },
   {
     id: "member-drag-marker",
     mode: "member",
     screen: "main",
     targetId: "drill-canvas",
-    title: "丸をドラッグで移動",
-    body: "丸を指で動かします。",
+    title: "丸を動かす",
+    body: "置いた丸はドラッグできます。",
     placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "丸をドラッグしてください"
+    targetActionLabel: "丸をドラッグ"
   },
   {
     id: "member-nudge-marker",
     mode: "member",
     screen: "main",
     targetId: "marker-nudge-controls",
-    title: "矢印で細かく調整",
-    body: "ドリルを見ながら矢印で動かします。",
+    title: "矢印で調整",
+    body: "細かい位置合わせに使います。",
     placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "矢印を1回押してください"
+    targetActionLabel: "矢印を1回タップ"
   },
   {
     id: "member-step-toggle",
     mode: "member",
     screen: "main",
     targetId: "marker-step-toggle",
-    title: "0.5歩に切り替える",
-    body: "細かく動かしたい時は0.5歩にできます。",
+    title: "移動幅を変える",
+    body: "0.5歩にするとさらに細かく動きます。",
     placement: "top",
     advanceOnTargetPress: true,
-    targetActionLabel: "1歩 / 0.5歩を押してください"
+    targetActionLabel: "1歩 / 0.5歩をタップ"
   },
   {
     id: "member-phase",
@@ -217,10 +217,10 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "phase-tabs",
     title: "入場と退場を切り替える",
-    body: "入場と退場を切り替えます。",
+    body: "両方のシートを入力します。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "入場 / 退場を押してください"
+    targetActionLabel: "入場 / 退場をタップ"
   },
   {
     id: "member-finished",
@@ -240,7 +240,7 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-add",
     title: "プロジェクト作成",
-    body: "右下の＋から作成します。",
+    body: "追加メニューから作成できます。",
     placement: "top"
   },
   {
@@ -249,10 +249,10 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-open",
     title: "プロジェクトを開く",
-    body: "プロジェクトを開きます。",
+    body: "管理するプロジェクトに入ります。",
     placement: "screen-bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "「開く」を押してください"
+    targetActionLabel: "開くをタップ"
   },
   {
     id: "admin-participant-button",
@@ -260,10 +260,10 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "participant-manager-button",
     title: "参加者管理",
-    body: "人型アイコンを押します。",
+    body: "参加者画面を開きます。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "人型アイコンを押してください"
+    targetActionLabel: "人型アイコンをタップ"
   },
   {
     id: "admin-invite",
@@ -271,7 +271,7 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "participantManager",
     targetId: "participant-manager-invite",
     title: "招待IDを共有",
-    body: "招待IDをコピーして共有します。",
+    body: "IDを共有するとメンバーが参加できます。",
     placement: "bottom"
   },
   {
@@ -280,7 +280,7 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "participantManager",
     targetId: "participant-manager-list",
     title: "参加者を整える",
-    body: "名前、丸の文字、削除を管理します。",
+    body: "名前、丸の文字、削除をここで管理します。",
     placement: "bottom"
   },
   {
@@ -289,7 +289,7 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "participantManager",
     targetId: "participant-manager-add",
     title: "参加者を追加",
-    body: "名前を入力して追加します。",
+    body: "下の欄から増やせます。",
     placement: "screen-top"
   },
   {
@@ -297,11 +297,11 @@ export const adminGuideSteps: GuideStep[] = [
     mode: "admin",
     screen: "main",
     targetId: "role-select",
-    title: "手具を管理",
-    body: "「変更」で手具画面を開きます。",
+    title: "手具管理",
+    body: "手具リストを開きます。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "「変更」を押してください"
+    targetActionLabel: "変更をタップ"
   },
   {
     id: "admin-add-role",
@@ -317,8 +317,8 @@ export const adminGuideSteps: GuideStep[] = [
     mode: "admin",
     screen: "sidebar",
     targetId: "sidebar-role-visibility",
-    title: "表示 / 非表示を切り替える",
-    body: "目アイコンで表示を切り替えます。",
+    title: "表示切替",
+    body: "目アイコンで出す / 隠すを変えます。",
     placement: "bottom"
   },
   {
@@ -327,10 +327,10 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "view-mode-tabs",
     title: "統合表示",
-    body: "全員分を重ねて見ます。",
+    body: "全員の配置を重ねて確認します。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "統合表示を押してください"
+    targetActionLabel: "統合表示をタップ"
   },
   {
     id: "admin-pdf",
@@ -338,10 +338,10 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "pdf-button",
     title: "PDF出力",
-    body: "PDF設定を開きます。",
+    body: "印刷や保存の設定に進みます。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "PDFアイコンを押してください"
+    targetActionLabel: "PDFアイコンをタップ"
   },
   {
     id: "admin-pdf-options",
@@ -358,10 +358,10 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "main",
     targetId: "project-settings-button",
     title: "プロジェクト設定",
-    body: "歯車アイコンを押します。",
+    body: "シートやプロジェクト名を管理します。",
     placement: "bottom",
     advanceOnTargetPress: true,
-    targetActionLabel: "歯車アイコンを押してください"
+    targetActionLabel: "歯車をタップ"
   },
   {
     id: "admin-versions",
@@ -369,7 +369,7 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "projectSettings",
     targetId: "project-settings-duplicate",
     title: "シートを更新版にする",
-    body: "大会ごとにコピーして更新できます。",
+    body: "大会ごとにシートをコピーできます。",
     placement: "bottom"
   }
 ];
