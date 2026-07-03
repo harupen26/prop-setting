@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import {
   Alert,
   Modal,
@@ -34,6 +34,7 @@ import {
   getProjectCompetitions
 } from "../selectors";
 import { GuideTarget } from "../guide/GuideOverlay";
+import type { GuideTargetId } from "../guide/guideContent";
 
 type ProjectSettingsProps = {
   visible: boolean;
@@ -43,6 +44,7 @@ type ProjectSettingsProps = {
   onBackToProjects: () => void;
   onExportPdf: () => void;
   guideOverlay?: ReactNode;
+  guideTargetId?: GuideTargetId;
 };
 
 type ParticipantManagerProps = {
@@ -51,6 +53,7 @@ type ParticipantManagerProps = {
   dispatch: Dispatch<AppAction>;
   onClose: () => void;
   guideOverlay?: ReactNode;
+  guideTargetId?: GuideTargetId;
 };
 
 export function ProjectSettingsPanel({
@@ -60,8 +63,10 @@ export function ProjectSettingsPanel({
   onClose,
   onBackToProjects,
   onExportPdf,
-  guideOverlay
+  guideOverlay,
+  guideTargetId
 }: ProjectSettingsProps) {
+  const scrollRef = useRef<ScrollView | null>(null);
   const activeProject = getActiveProject(state);
   const activeCompetition = getActiveCompetition(state);
   const projectCompetitions = getProjectCompetitions(state);
@@ -70,6 +75,27 @@ export function ProjectSettingsPanel({
     const baseName = activeCompetition?.name ?? "県大会";
     return `${baseName} 更新版`;
   }, [activeCompetition?.name]);
+
+  useEffect(() => {
+    if (!visible || !guideTargetId) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      if (guideTargetId === "project-settings-duplicate") {
+        scrollRef.current?.scrollTo({ y: 260, animated: true });
+        return;
+      }
+
+      if (guideTargetId === "project-settings-list") {
+        scrollRef.current?.scrollTo({ y: 80, animated: true });
+      }
+    }, 260);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [guideTargetId, visible]);
 
   function duplicateCompetition() {
     if (!activeCompetition) {
@@ -142,7 +168,7 @@ export function ProjectSettingsPanel({
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <Text style={styles.title}>プロジェクト設定</Text>
             <Text style={styles.subtitle}>プロジェクト名とシートのバージョンを管理します。</Text>
@@ -243,7 +269,15 @@ export function ProjectSettingsPanel({
   );
 }
 
-export function ParticipantManagerPanel({ visible, state, dispatch, onClose, guideOverlay }: ParticipantManagerProps) {
+export function ParticipantManagerPanel({
+  visible,
+  state,
+  dispatch,
+  onClose,
+  guideOverlay,
+  guideTargetId
+}: ParticipantManagerProps) {
+  const scrollRef = useRef<ScrollView | null>(null);
   const activeProject = getActiveProject(state);
   const activeParticipant = getActiveParticipant(state);
   const integratedIds = state.integratedParticipantIdsByCompetition[state.activeCompetitionId] ?? [];
@@ -252,6 +286,37 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose, gui
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const shareId = activeProject?.shareId ?? "未発行";
   const inviteLink = `propsetting://project/${shareId}`;
+
+  useEffect(() => {
+    if (!visible || !guideTargetId) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      if (guideTargetId === "participant-manager-add") {
+        scrollRef.current?.scrollTo({ y: 430, animated: true });
+        return;
+      }
+
+      if (guideTargetId === "participant-manager-integrate") {
+        scrollRef.current?.scrollToEnd({ animated: true });
+        return;
+      }
+
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    }, 260);
+
+    const second = setTimeout(() => {
+      if (guideTargetId === "participant-manager-add") {
+        scrollRef.current?.scrollTo({ y: 430, animated: true });
+      }
+    }, 700);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(second);
+    };
+  }, [guideTargetId, visible]);
 
   function addParticipant() {
     const name = newParticipantName.trim();
@@ -306,7 +371,7 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose, gui
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <GuideTarget targetId="participant-manager-invite" style={styles.section}>
             <Text style={styles.sectionTitle}>招待</Text>
             <Text style={styles.linkText}>招待ID: {shareId}</Text>

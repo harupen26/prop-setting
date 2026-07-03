@@ -26,6 +26,7 @@ export type GuideTargetId =
   | "role-select"
   | "drill-canvas"
   | "drill-zoom-buttons"
+  | "marker-step-toggle"
   | "marker-nudge-controls"
   | "sidebar-role-list"
   | "sidebar-add-role"
@@ -188,12 +189,23 @@ export const memberGuideSteps: GuideStep[] = [
     targetActionLabel: "丸をドラッグしてください"
   },
   {
+    id: "member-step-toggle",
+    mode: "member",
+    screen: "main",
+    targetId: "marker-step-toggle",
+    title: "歩数を切り替える",
+    body: "1歩と0.5歩を切り替えます。",
+    placement: "top",
+    advanceOnTargetPress: true,
+    targetActionLabel: "1歩 / 0.5歩を押してください"
+  },
+  {
     id: "member-nudge-marker",
     mode: "member",
     screen: "main",
     targetId: "marker-nudge-controls",
     title: "矢印で細かく調整",
-    body: "矢印で少しずつ動かせます。",
+    body: "ドリルを見ながら矢印で動かします。",
     placement: "top",
     advanceOnTargetPress: true,
     targetActionLabel: "矢印を1回押してください"

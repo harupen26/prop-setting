@@ -141,9 +141,9 @@ function AppShell() {
     }
 
     const first = setTimeout(() => {
-      if (targetId === "marker-nudge-controls") {
+      if (targetId === "marker-step-toggle" || targetId === "marker-nudge-controls") {
         setCanvasInteractionLocked(false);
-        mainScrollRef.current?.scrollToEnd({ animated: true });
+        mainScrollRef.current?.scrollTo({ y: 260, animated: true });
         return;
       }
 
@@ -158,8 +158,8 @@ function AppShell() {
     }, 220);
 
     const second = setTimeout(() => {
-      if (targetId === "marker-nudge-controls") {
-        mainScrollRef.current?.scrollToEnd({ animated: true });
+      if (targetId === "marker-step-toggle" || targetId === "marker-nudge-controls") {
+        mainScrollRef.current?.scrollTo({ y: 260, animated: true });
       }
     }, 620);
 
@@ -652,15 +652,20 @@ function AppShell() {
                   横 {selectedMarker.xSnap} / 縦 {selectedMarker.ySnap}
                 </Text>
               </View>
-              <Pressable
-                accessibilityLabel="細かい調整に切り替え"
-                style={[styles.fineToggle, fineAdjustMode && styles.fineToggleActive]}
-                onPress={() => setFineAdjustMode((value) => !value)}
-              >
-                <Text style={[styles.fineToggleText, fineAdjustMode && styles.fineToggleTextActive]}>
-                  {fineAdjustMode ? "0.5歩" : "1歩"}
-                </Text>
-              </Pressable>
+              <GuideTarget targetId="marker-step-toggle">
+                <Pressable
+                  accessibilityLabel="細かい調整に切り替え"
+                  style={[styles.fineToggle, fineAdjustMode && styles.fineToggleActive]}
+                  onPress={() => {
+                    setFineAdjustMode((value) => !value);
+                    completeGuideTarget("marker-step-toggle");
+                  }}
+                >
+                  <Text style={[styles.fineToggleText, fineAdjustMode && styles.fineToggleTextActive]}>
+                    {fineAdjustMode ? "0.5歩" : "1歩"}
+                  </Text>
+                </Pressable>
+              </GuideTarget>
             </View>
             <View style={styles.adjustRow}>
               <GuideTarget targetId="marker-nudge-controls" style={styles.nudgePad}>
@@ -734,6 +739,7 @@ function AppShell() {
         dispatch={dispatch}
         onClose={() => setParticipantManagerOpen(false)}
         guideOverlay={guideOverlayInParticipantManager ? embeddedGuideOverlay : undefined}
+        guideTargetId={currentGuideStep?.targetId}
       />
       <ProjectSettingsPanel
         visible={projectSettingsOpen}
@@ -746,6 +752,7 @@ function AppShell() {
         }}
         onExportPdf={openPdfOptions}
         guideOverlay={guideOverlayInProjectSettings ? embeddedGuideOverlay : undefined}
+        guideTargetId={currentGuideStep?.targetId}
       />
       <PdfOptionsModal
         visible={pdfOptionsOpen}
@@ -781,6 +788,7 @@ function ProjectListScreen({
   const [projectName, setProjectName] = useState("");
   const [createInviteId, setCreateInviteId] = useState(() => generateInviteId(""));
   const [joinInviteId, setJoinInviteId] = useState("");
+  const joinInviteInputRef = useRef<TextInput | null>(null);
 
   function openProjectAction() {
     setActionMode("create");
@@ -949,6 +957,12 @@ function ProjectListScreen({
       <Modal visible={actionOpen} transparent animationType="fade" onRequestClose={() => setActionOpen(false)}>
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setActionOpen(false)} />
+          <ScrollView
+            style={styles.projectActionScroller}
+            contentContainerStyle={styles.projectActionScrollerContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.projectActionPanel}>
             <View style={styles.projectActionHeader}>
               <Text style={styles.projectActionTitle}>プロジェクトを追加</Text>
@@ -1023,12 +1037,16 @@ function ProjectListScreen({
                 <Text style={styles.projectActionLabel}>招待ID</Text>
                 <GuideTarget targetId="project-join-invite-input">
                   <TextInput
+                    ref={joinInviteInputRef}
                     value={joinInviteId}
                     onChangeText={(value) => {
                       const formatted = formatInviteIdInput(value);
                       setJoinInviteId(formatted);
                       if (formatted === SAMPLE_INVITE_ID) {
-                        Keyboard.dismiss();
+                        setTimeout(() => {
+                          joinInviteInputRef.current?.blur();
+                          Keyboard.dismiss();
+                        }, 30);
                         onGuideTargetPress("project-join-invite-input");
                       }
                     }}
@@ -1036,7 +1054,13 @@ function ProjectListScreen({
                     placeholderTextColor={colors.textMuted}
                     autoCapitalize="characters"
                     autoCorrect={false}
+                    blurOnSubmit
+                    returnKeyType="done"
                     style={styles.projectActionInput}
+                    onSubmitEditing={() => {
+                      joinInviteInputRef.current?.blur();
+                      Keyboard.dismiss();
+                    }}
                   />
                 </GuideTarget>
                 <Text style={styles.projectActionHelp}>{INVITE_ID_HELP}</Text>
@@ -1054,6 +1078,7 @@ function ProjectListScreen({
               </View>
             )}
           </View>
+          </ScrollView>
           {guideOverlay}
         </View>
       </Modal>
@@ -1398,6 +1423,16 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
     backgroundColor: colors.surface
+  },
+  projectActionScroller: {
+    width: "100%",
+    maxWidth: 460,
+    maxHeight: "92%"
+  },
+  projectActionScrollerContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 12
   },
   projectActionHeader: {
     gap: 4

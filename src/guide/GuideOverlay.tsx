@@ -42,6 +42,7 @@ type GuideRegistry = {
 const GuideContext = createContext<GuideRegistry | undefined>(undefined);
 
 const OVERLAY_COLOR = "rgba(15, 23, 42, 0.62)";
+const ACTION_OVERLAY_COLOR = "rgba(15, 23, 42, 0.2)";
 const TARGET_PADDING = 7;
 const BUBBLE_MARGIN = 10;
 const BUBBLE_GAP = 10;
@@ -179,11 +180,15 @@ export function GuideOverlay({
 
     const first = setTimeout(measure, 80);
     const second = setTimeout(measure, 340);
+    const third = setTimeout(measure, 760);
+    const fourth = setTimeout(measure, 1120);
 
     return () => {
       cancelled = true;
       clearTimeout(first);
       clearTimeout(second);
+      clearTimeout(third);
+      clearTimeout(fourth);
     };
   }, [measureTarget, registryRevision, step?.targetId, visible]);
 
@@ -257,6 +262,7 @@ export function GuideOverlay({
         width={dimensions.width}
         height={dimensions.height}
         allowTargetPress={waitsForTargetAction}
+        soft={waitsForTargetAction}
       />
       {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
       <View
@@ -319,18 +325,27 @@ function OverlayScrim({
   layout,
   width,
   height,
-  allowTargetPress = false
+  allowTargetPress = false,
+  soft = false
 }: {
   layout: TargetLayout | undefined;
   width: number;
   height: number;
   allowTargetPress?: boolean;
+  soft?: boolean;
 }) {
+  const scrimStyle = [styles.scrimPiece, { backgroundColor: soft ? ACTION_OVERLAY_COLOR : OVERLAY_COLOR }];
+
   if (!layout) {
-    return <View pointerEvents={allowTargetPress ? "none" : "auto"} style={styles.fullScrim} />;
+    return (
+      <View
+        pointerEvents={allowTargetPress ? "none" : "auto"}
+        style={[styles.fullScrim, { backgroundColor: soft ? ACTION_OVERLAY_COLOR : OVERLAY_COLOR }]}
+      />
+    );
   }
 
-  const blockOutsideTouch = allowTargetPress ? { onStartShouldSetResponder: () => true } : undefined;
+  const piecePointerEvents = allowTargetPress ? "none" : "auto";
   const highlight = expandLayout(layout);
   const topHeight = Math.max(0, highlight.y);
   const bottomTop = Math.min(height, highlight.y + highlight.height);
@@ -339,13 +354,16 @@ function OverlayScrim({
 
   return (
     <>
-      <View {...blockOutsideTouch} style={[styles.scrimPiece, { left: 0, right: 0, top: 0, height: topHeight }]} />
-      <View {...blockOutsideTouch} style={[styles.scrimPiece, { left: 0, right: 0, top: bottomTop, bottom: 0 }]} />
-      <View {...blockOutsideTouch} style={[styles.scrimPiece, { left: 0, top: sideTop, width: Math.max(0, highlight.x), height: sideHeight }]} />
+      <View pointerEvents={piecePointerEvents} style={[scrimStyle, { left: 0, right: 0, top: 0, height: topHeight }]} />
+      <View pointerEvents={piecePointerEvents} style={[scrimStyle, { left: 0, right: 0, top: bottomTop, bottom: 0 }]} />
       <View
-        {...blockOutsideTouch}
+        pointerEvents={piecePointerEvents}
+        style={[scrimStyle, { left: 0, top: sideTop, width: Math.max(0, highlight.x), height: sideHeight }]}
+      />
+      <View
+        pointerEvents={piecePointerEvents}
         style={[
-          styles.scrimPiece,
+          scrimStyle,
           {
             left: Math.min(width, highlight.x + highlight.width),
             right: 0,
@@ -412,7 +430,7 @@ function getBubbleStyle(
   const canFitBelow = bottomSpace >= bubbleHeight;
   const preferTop = placement === "top";
   const preferBottom = placement === "bottom" || !placement;
-  const top =
+  const rawTop =
     preferTop && canFitAbove
       ? aboveTop
       : preferBottom && canFitBelow
@@ -424,6 +442,7 @@ function getBubbleStyle(
             : bottomSpace >= topSpace
               ? clamp(belowTop, BUBBLE_MARGIN, maxTop)
               : clamp(aboveTop, BUBBLE_MARGIN, maxTop);
+  const top = clamp(rawTop, BUBBLE_MARGIN, maxTop);
 
   return {
     left: clamp(target.x + target.width / 2 - width / 2, BUBBLE_MARGIN, screenWidth - width - BUBBLE_MARGIN),
