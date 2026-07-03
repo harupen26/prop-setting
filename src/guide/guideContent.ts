@@ -29,6 +29,7 @@ export type GuideTargetId =
   | "marker-step-toggle"
   | "marker-nudge-controls"
   | "sidebar-role-list"
+  | "sidebar-role-visibility"
   | "sidebar-add-role"
   | "participant-manager-invite"
   | "participant-manager-list"
@@ -315,7 +316,7 @@ export const adminGuideSteps: GuideStep[] = [
     id: "admin-role-visibility",
     mode: "admin",
     screen: "sidebar",
-    targetId: "sidebar-role-list",
+    targetId: "sidebar-role-visibility",
     title: "表示 / 非表示を切り替える",
     body: "目アイコンで表示を切り替えます。",
     placement: "bottom"

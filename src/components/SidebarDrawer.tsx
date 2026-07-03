@@ -105,7 +105,7 @@ export function SidebarDrawer({
         return;
       }
 
-      if (guideTargetId === "sidebar-role-list") {
+      if (guideTargetId === "sidebar-role-list" || guideTargetId === "sidebar-role-visibility") {
         scrollRef.current?.scrollTo({ y: 0, animated: true });
       }
     }, 260);
@@ -190,8 +190,24 @@ export function SidebarDrawer({
               {state.folders
                 .slice()
                 .sort((a, b) => a.order - b.order)
-                .map((folderItem) => {
+                .map((folderItem, folderIndex) => {
                   const folderRoles = rolesByFolder.get(folderItem.id) ?? [];
+                  const folderEyeButton = (
+                    <Pressable
+                      accessibilityLabel={folderItem.visible ? "非表示にする" : "表示する"}
+                      style={styles.eyeButton}
+                      onPress={() =>
+                        dispatch({ type: "toggleFolderVisible", folderId: folderItem.id })
+                      }
+                    >
+                      {folderItem.visible ? (
+                        <Eye size={18} color={colors.text} />
+                      ) : (
+                        <EyeOff size={18} color={colors.textMuted} />
+                      )}
+                    </Pressable>
+                  );
+
                   return (
                     <View key={folderItem.id} style={styles.folderBlock}>
                       <View style={styles.folderHeader}>
@@ -210,19 +226,13 @@ export function SidebarDrawer({
                           <Folder size={17} color={colors.textMuted} />
                           <Text style={styles.folderText}>{folderItem.name}</Text>
                         </Pressable>
-                        <Pressable
-                          accessibilityLabel={folderItem.visible ? "非表示にする" : "表示する"}
-                          style={styles.eyeButton}
-                          onPress={() =>
-                            dispatch({ type: "toggleFolderVisible", folderId: folderItem.id })
-                          }
-                        >
-                          {folderItem.visible ? (
-                            <Eye size={18} color={colors.text} />
-                          ) : (
-                            <EyeOff size={18} color={colors.textMuted} />
-                          )}
-                        </Pressable>
+                        {folderIndex === 0 ? (
+                          <GuideTarget targetId="sidebar-role-visibility" style={styles.eyeGuideTarget}>
+                            {folderEyeButton}
+                          </GuideTarget>
+                        ) : (
+                          folderEyeButton
+                        )}
                       </View>
 
                       {!folderItem.collapsed &&
@@ -435,6 +445,10 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: "center",
     justifyContent: "center"
+  },
+  eyeGuideTarget: {
+    width: 36,
+    height: 36
   },
   roleRow: {
     minHeight: 44,

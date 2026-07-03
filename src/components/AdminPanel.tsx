@@ -71,6 +71,8 @@ export function ProjectSettingsPanel({
   const activeCompetition = getActiveCompetition(state);
   const projectCompetitions = getProjectCompetitions(state);
   const [duplicateName, setDuplicateName] = useState("");
+  const [deleteCompetitionCandidate, setDeleteCompetitionCandidate] = useState<Competition | undefined>();
+  const [deleteCompetitionStep, setDeleteCompetitionStep] = useState<1 | 2>(1);
   const duplicatePlaceholder = useMemo(() => {
     const baseName = activeCompetition?.name ?? "県大会";
     return `${baseName} 更新版`;
@@ -121,31 +123,22 @@ export function ProjectSettingsPanel({
       return;
     }
 
-    Alert.alert(
-      "更新版シートを削除しますか？",
-      `「${competition.name}」にある丸の配置も削除対象になります。`,
-      [
-        { text: "キャンセル", style: "cancel" },
-        {
-          text: "次へ",
-          style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              "本当に削除しますか？",
-              "データは完全に失われます。この操作は元に戻せません。",
-              [
-                { text: "キャンセル", style: "cancel" },
-                {
-                  text: "完全に削除",
-                  style: "destructive",
-                  onPress: () => dispatch({ type: "deleteCompetition", competitionId: competition.id })
-                }
-              ]
-            );
-          }
-        }
-      ]
-    );
+    setDeleteCompetitionCandidate(competition);
+    setDeleteCompetitionStep(1);
+  }
+
+  function closeDeleteCompetition() {
+    setDeleteCompetitionCandidate(undefined);
+    setDeleteCompetitionStep(1);
+  }
+
+  function deleteCompetition() {
+    if (!deleteCompetitionCandidate) {
+      return;
+    }
+
+    dispatch({ type: "deleteCompetition", competitionId: deleteCompetitionCandidate.id });
+    closeDeleteCompetition();
   }
 
   function resetData() {
@@ -263,6 +256,36 @@ export function ProjectSettingsPanel({
             </Pressable>
           </View>
         </ScrollView>
+        {deleteCompetitionCandidate ? (
+          <View style={styles.confirmOverlay}>
+            <Pressable style={styles.confirmBackdrop} onPress={closeDeleteCompetition} />
+            <View style={styles.confirmPanel}>
+              <Text style={styles.confirmTitle}>
+                {deleteCompetitionStep === 1 ? "更新版シートを削除しますか？" : "本当に削除しますか？"}
+              </Text>
+              <Text style={styles.confirmMessage}>
+                {deleteCompetitionStep === 1
+                  ? `「${deleteCompetitionCandidate.name}」の丸の配置も削除されます。`
+                  : "データは完全に失われます。この操作は元に戻せません。"}
+              </Text>
+              <View style={styles.confirmActions}>
+                <Pressable style={styles.confirmCancelButton} onPress={closeDeleteCompetition}>
+                  <Text style={styles.confirmCancelText}>キャンセル</Text>
+                </Pressable>
+                {deleteCompetitionStep === 1 ? (
+                  <Pressable style={styles.confirmDangerButton} onPress={() => setDeleteCompetitionStep(2)}>
+                    <Text style={styles.confirmDangerText}>次へ</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={styles.confirmDangerButton} onPress={deleteCompetition}>
+                    <Trash2 size={16} color="#ffffff" />
+                    <Text style={styles.confirmDangerText}>完全に削除</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          </View>
+        ) : null}
         {guideOverlay}
       </SafeAreaView>
     </Modal>
@@ -278,6 +301,7 @@ export function ParticipantManagerPanel({
   guideTargetId
 }: ParticipantManagerProps) {
   const scrollRef = useRef<ScrollView | null>(null);
+  const participantAddYRef = useRef(0);
   const activeProject = getActiveProject(state);
   const activeParticipant = getActiveParticipant(state);
   const integratedIds = state.integratedParticipantIdsByCompetition[state.activeCompetitionId] ?? [];
@@ -287,6 +311,10 @@ export function ParticipantManagerPanel({
   const shareId = activeProject?.shareId ?? "未発行";
   const inviteLink = `propsetting://project/${shareId}`;
 
+  function scrollToParticipantAdd() {
+    scrollRef.current?.scrollTo({ y: Math.max(0, participantAddYRef.current - 220), animated: true });
+  }
+
   useEffect(() => {
     if (!visible || !guideTargetId) {
       return undefined;
@@ -294,7 +322,7 @@ export function ParticipantManagerPanel({
 
     const timer = setTimeout(() => {
       if (guideTargetId === "participant-manager-add") {
-        scrollRef.current?.scrollTo({ y: 430, animated: true });
+        scrollToParticipantAdd();
         return;
       }
 
@@ -308,13 +336,20 @@ export function ParticipantManagerPanel({
 
     const second = setTimeout(() => {
       if (guideTargetId === "participant-manager-add") {
-        scrollRef.current?.scrollTo({ y: 430, animated: true });
+        scrollToParticipantAdd();
       }
     }, 700);
+
+    const third = setTimeout(() => {
+      if (guideTargetId === "participant-manager-add") {
+        scrollToParticipantAdd();
+      }
+    }, 1200);
 
     return () => {
       clearTimeout(timer);
       clearTimeout(second);
+      clearTimeout(third);
     };
   }, [guideTargetId, visible]);
 
@@ -459,21 +494,27 @@ export function ParticipantManagerPanel({
               </View>
             </GuideTarget>
 
-            <GuideTarget targetId="participant-manager-add">
-              <View style={styles.inlineForm}>
-                <TextInput
-                  value={newParticipantName}
-                  onChangeText={setNewParticipantName}
-                  placeholder="新しい参加者名"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.inlineInput}
-                />
-                <Pressable style={styles.actionButton} onPress={addParticipant}>
-                  <Plus size={17} color={colors.text} />
-                  <Text style={styles.actionText}>追加</Text>
-                </Pressable>
-              </View>
-            </GuideTarget>
+            <View
+              onLayout={(event) => {
+                participantAddYRef.current = event.nativeEvent.layout.y;
+              }}
+            >
+              <GuideTarget targetId="participant-manager-add">
+                <View style={styles.inlineForm}>
+                  <TextInput
+                    value={newParticipantName}
+                    onChangeText={setNewParticipantName}
+                    placeholder="新しい参加者名"
+                    placeholderTextColor={colors.textMuted}
+                    style={styles.inlineInput}
+                  />
+                  <Pressable style={styles.actionButton} onPress={addParticipant}>
+                    <Plus size={17} color={colors.text} />
+                    <Text style={styles.actionText}>追加</Text>
+                  </Pressable>
+                </View>
+              </GuideTarget>
+            </View>
             <Text style={styles.helpText}>
               名前を変えると丸内ラベルも自動更新されます。削除すると、その参加者の全シートの丸配置も削除されます。
             </Text>

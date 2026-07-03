@@ -980,7 +980,7 @@ function ProjectListScreen({
           <ScrollView
             style={styles.projectActionScroller}
             contentContainerStyle={styles.projectActionScrollerContent}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             showsVerticalScrollIndicator={false}
           >
           <View style={styles.projectActionPanel}>

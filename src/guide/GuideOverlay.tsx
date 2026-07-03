@@ -162,6 +162,7 @@ export function GuideOverlay({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const stepId = step?.id;
   const waitsForTargetAction = !!step?.advanceOnTargetPress && !!step.targetId;
+  const actionPassThrough = waitsForTargetAction && !actionFallbackVisible;
 
   useEffect(() => {
     let cancelled = false;
@@ -256,7 +257,7 @@ export function GuideOverlay({
           ]
         }
       ]}
-      pointerEvents={waitsForTargetAction ? "box-none" : "auto"}
+      pointerEvents={actionPassThrough ? "none" : waitsForTargetAction ? "box-none" : "auto"}
     >
       <OverlayScrim
         layout={targetLayout}
@@ -267,7 +268,7 @@ export function GuideOverlay({
       />
       {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
       <View
-        pointerEvents={waitsForTargetAction ? "box-none" : "auto"}
+        pointerEvents={actionPassThrough ? "none" : waitsForTargetAction ? "box-none" : "auto"}
         style={[styles.bubble, bubbleStyle]}
         onLayout={handleBubbleLayout}
       >
