@@ -38,7 +38,8 @@ export function HelpPanel({
           <View style={styles.hero}>
             <Text style={styles.heroTitle}>迷ったらここから確認できます</Text>
             <Text style={styles.heroText}>
-              初めての人はチュートリアルを開始すると、実際のボタンを吹き出しで案内します。
+              初めての人はチュートリアルを開始すると、実際のボタンを押しながら練習できます。
+              練習中の変更は終了時に元に戻ります。
             </Text>
           </View>
 
@@ -87,7 +88,8 @@ export function GuideIntroPrompt({
         <View style={styles.introPanel}>
           <Text style={styles.introTitle}>使い方を見ますか？</Text>
           <Text style={styles.introText}>
-            初めて使う人向けに、実際のボタンを吹き出しで案内します。あとからヘルプでも見直せます。
+            初めて使う人向けに、実際のボタンを押しながら案内します。
+            練習中の変更は最後に元に戻り、あとからヘルプでも見直せます。
           </Text>
           <View style={styles.introActions}>
             <Pressable style={styles.primaryGuideButton} onPress={() => onStartGuide("member")}>

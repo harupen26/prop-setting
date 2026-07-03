@@ -165,32 +165,37 @@ export function ProjectSettingsPanel({
                 const active = competition.id === state.activeCompetitionId;
                 return (
                   <View key={competition.id} style={[styles.sheetRow, active && styles.sheetRowActive]}>
-                    <Pressable
-                      accessibilityLabel={`${competition.name}を開く`}
-                      style={[styles.sheetSelect, active && styles.sheetSelectActive]}
-                      onPress={() => dispatch({ type: "setActiveCompetition", competitionId: competition.id })}
-                    >
-                      <Text style={[styles.sheetSelectText, active && styles.sheetSelectTextActive]}>
-                        {active ? "開いている" : "開く"}
-                      </Text>
-                    </Pressable>
-                    <TextInput
-                      value={competition.name}
-                      onChangeText={(name) =>
-                        dispatch({ type: "updateCompetitionName", competitionId: competition.id, name })
-                      }
-                      placeholder="例: 関東大会"
-                      placeholderTextColor={colors.textMuted}
-                      style={[styles.input, styles.sheetNameInput]}
-                    />
-                    {competition.copiedFromCompetitionId ? (
+                    <View style={styles.sheetRowMain}>
                       <Pressable
-                        accessibilityLabel={`${competition.name}を削除`}
-                        style={styles.sheetDeleteButton}
-                        onPress={() => confirmDeleteCompetition(competition)}
+                        accessibilityLabel={`${competition.name}を開く`}
+                        style={[styles.sheetSelect, active && styles.sheetSelectActive]}
+                        onPress={() => dispatch({ type: "setActiveCompetition", competitionId: competition.id })}
                       >
-                        <Trash2 size={16} color={colors.danger} />
+                        <Text style={[styles.sheetSelectText, active && styles.sheetSelectTextActive]}>
+                          {active ? "開いている" : "開く"}
+                        </Text>
                       </Pressable>
+                      <TextInput
+                        value={competition.name}
+                        onChangeText={(name) =>
+                          dispatch({ type: "updateCompetitionName", competitionId: competition.id, name })
+                        }
+                        placeholder="例: 関東大会"
+                        placeholderTextColor={colors.textMuted}
+                        style={[styles.input, styles.sheetNameInput]}
+                      />
+                    </View>
+                    {competition.copiedFromCompetitionId ? (
+                      <View style={styles.sheetActionLine}>
+                        <Pressable
+                          accessibilityLabel={`${competition.name}を削除`}
+                          style={styles.sheetDeleteButton}
+                          onPress={() => confirmDeleteCompetition(competition)}
+                        >
+                          <Trash2 size={15} color={colors.danger} />
+                          <Text style={styles.sheetDeleteText}>削除</Text>
+                        </Pressable>
+                      </View>
                     ) : null}
                   </View>
                 );
@@ -566,10 +571,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: 8,
-    flexDirection: "row",
-    alignItems: "center",
     gap: 8,
     backgroundColor: colors.surfaceSoft
+  },
+  sheetRowMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   sheetRowActive: {
     borderColor: colors.text
@@ -599,15 +607,26 @@ const styles = StyleSheet.create({
   sheetNameInput: {
     flex: 1
   },
+  sheetActionLine: {
+    flexDirection: "row",
+    justifyContent: "flex-end"
+  },
   sheetDeleteButton: {
-    width: 40,
-    height: 40,
+    minHeight: 34,
+    paddingHorizontal: 12,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 5,
     backgroundColor: colors.surface
+  },
+  sheetDeleteText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "900"
   },
   inlineForm: {
     flexDirection: "row",

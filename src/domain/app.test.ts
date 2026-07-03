@@ -74,6 +74,12 @@ describe("使い方ガイド", () => {
     expect(helpSections.length).toBeGreaterThan(0);
     expect(helpSections.every((section) => section.body.length > 0)).toBe(true);
   });
+
+  it("実際に押して進めるステップを含む", () => {
+    const steps = [...getGuideSteps("member"), ...getGuideSteps("admin")];
+
+    expect(steps.some((step) => step.advanceOnTargetPress)).toBe(true);
+  });
 });
 
 describe("統合", () => {

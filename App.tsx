@@ -1,4 +1,4 @@
-import { type Dispatch, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type Dispatch, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -63,6 +63,17 @@ import {
 } from "./src/selectors";
 import { isSupabaseConfigured } from "./src/lib/supabase";
 
+type GuideUiSnapshot = {
+  canvasInteractionLocked: boolean;
+  drawerOpen: boolean;
+  fineAdjustMode: boolean;
+  participantManagerOpen: boolean;
+  pdfOptionsOpen: boolean;
+  projectListOpen: boolean;
+  projectSettingsOpen: boolean;
+  selectedMarkerId: string | undefined;
+};
+
 export default function App() {
   return (
     <GuideProvider>
@@ -74,6 +85,8 @@ export default function App() {
 function AppShell() {
   const { state, dispatch, hydrated } = usePersistentState();
   const { preferences, guideHydrated, markIntroSeen, markGuideCompleted } = useGuidePreferences();
+  const guideStateSnapshotRef = useRef<AppState | undefined>(undefined);
+  const guideUiSnapshotRef = useRef<GuideUiSnapshot | undefined>(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [projectListOpen, setProjectListOpen] = useState(true);
   const [participantManagerOpen, setParticipantManagerOpen] = useState(false);
@@ -101,6 +114,8 @@ function AppShell() {
   );
   const guideSteps = useMemo(() => (activeGuideMode ? getGuideSteps(activeGuideMode) : []), [activeGuideMode]);
   const currentGuideStep = guideSteps[guideIndex];
+  const activeGuideTargetId =
+    currentGuideStep?.advanceOnTargetPress && currentGuideStep.targetId ? currentGuideStep.targetId : undefined;
 
   useEffect(() => {
     if (!hydrated || !guideHydrated || preferences.hasSeenIntroTutorial || activeGuideMode) {
@@ -232,6 +247,17 @@ function AppShell() {
 
   function startGuide(mode: GuideMode) {
     const nextSteps = getGuideSteps(mode);
+    guideStateSnapshotRef.current = cloneAppState(state);
+    guideUiSnapshotRef.current = {
+      canvasInteractionLocked,
+      drawerOpen,
+      fineAdjustMode,
+      participantManagerOpen,
+      pdfOptionsOpen,
+      projectListOpen,
+      projectSettingsOpen,
+      selectedMarkerId
+    };
     setHelpOpen(false);
     setIntroOpen(false);
     setActiveGuideMode(mode);
@@ -244,8 +270,34 @@ function AppShell() {
     if (completed && activeGuideMode) {
       void markGuideCompleted(activeGuideMode);
     }
+
+    const stateSnapshot = guideStateSnapshotRef.current;
+    const uiSnapshot = guideUiSnapshotRef.current;
+    if (stateSnapshot) {
+      dispatch({ type: "hydrate", state: stateSnapshot });
+    }
+    if (uiSnapshot) {
+      setCanvasInteractionLocked(uiSnapshot.canvasInteractionLocked);
+      setDrawerOpen(uiSnapshot.drawerOpen);
+      setFineAdjustMode(uiSnapshot.fineAdjustMode);
+      setParticipantManagerOpen(uiSnapshot.participantManagerOpen);
+      setPdfOptionsOpen(uiSnapshot.pdfOptionsOpen);
+      setProjectListOpen(uiSnapshot.projectListOpen);
+      setProjectSettingsOpen(uiSnapshot.projectSettingsOpen);
+      setSelectedMarkerId(uiSnapshot.selectedMarkerId);
+    }
+    guideStateSnapshotRef.current = undefined;
+    guideUiSnapshotRef.current = undefined;
     setActiveGuideMode(undefined);
     setGuideIndex(0);
+  }
+
+  function completeGuideTarget(targetId: GuideStep["targetId"]) {
+    if (!targetId || activeGuideTargetId !== targetId) {
+      return;
+    }
+
+    setTimeout(showNextGuideStep, 180);
   }
 
   function showNextGuideStep() {
@@ -302,6 +354,7 @@ function AppShell() {
         onNext={showNextGuideStep}
         onBack={showPreviousGuideStep}
         onSkip={() => stopGuide(false)}
+        practiceMode={!!activeGuideMode}
       />
     </>
   );
@@ -323,6 +376,7 @@ function AppShell() {
           dispatch={dispatch}
           onOpenProject={openProject}
           onOpenHelp={() => setHelpOpen(true)}
+          onGuideTargetPress={completeGuideTarget}
         />
         {guideLayers}
       </>
@@ -349,13 +403,23 @@ function AppShell() {
             <Pressable
               accessibilityLabel="参加者管理を開く"
               style={styles.iconButton}
-              onPress={() => setParticipantManagerOpen(true)}
+              onPress={() => {
+                setParticipantManagerOpen(true);
+                completeGuideTarget("participant-manager-button");
+              }}
             >
               <Users size={20} color={colors.text} />
             </Pressable>
           </GuideTarget>
           <GuideTarget targetId="pdf-button">
-            <Pressable accessibilityLabel="PDF出力" style={styles.iconButton} onPress={openPdfOptions}>
+            <Pressable
+              accessibilityLabel="PDF出力"
+              style={styles.iconButton}
+              onPress={() => {
+                openPdfOptions();
+                completeGuideTarget("pdf-button");
+              }}
+            >
               <FileDown size={20} color={colors.text} />
             </Pressable>
           </GuideTarget>
@@ -363,7 +427,10 @@ function AppShell() {
             <Pressable
               accessibilityLabel="プロジェクト設定を開く"
               style={styles.iconButton}
-              onPress={() => setProjectSettingsOpen(true)}
+              onPress={() => {
+                setProjectSettingsOpen(true);
+                completeGuideTarget("project-settings-button");
+              }}
             >
               <Settings size={20} color={colors.text} />
             </Pressable>
@@ -387,6 +454,7 @@ function AppShell() {
               onChange={(phase) => {
                 setSelectedMarkerId(undefined);
                 dispatch({ type: "setPhase", phase });
+                completeGuideTarget("phase-tabs");
               }}
             />
           </GuideTarget>
@@ -400,6 +468,7 @@ function AppShell() {
               onChange={(viewMode) => {
                 setSelectedMarkerId(undefined);
                 dispatch({ type: "setViewMode", viewMode });
+                completeGuideTarget("view-mode-tabs");
               }}
             />
           </GuideTarget>
@@ -420,6 +489,7 @@ function AppShell() {
                     onPress={() => {
                       setSelectedMarkerId(undefined);
                       dispatch({ type: "setActiveParticipant", participantId: participant.id });
+                      completeGuideTarget("participant-list");
                     }}
                     style={[styles.participantChip, active && styles.participantChipActive]}
                   >
@@ -445,7 +515,13 @@ function AppShell() {
                 <Text style={styles.selectedRoleName}>{selectedRole?.name ?? "未選択"}</Text>
               </View>
             </View>
-            <Pressable style={styles.secondaryButton} onPress={() => setDrawerOpen(true)}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => {
+                setDrawerOpen(true);
+                completeGuideTarget("role-select");
+              }}
+            >
               <Text style={styles.secondaryButtonText}>変更</Text>
             </Pressable>
           </View>
@@ -464,6 +540,7 @@ function AppShell() {
             }
             onSelect={setSelectedMarkerId}
             onInteractionLockChange={setCanvasInteractionLocked}
+            onGuidePlace={() => completeGuideTarget("drill-canvas")}
           />
         </GuideTarget>
 
@@ -578,12 +655,14 @@ function ProjectListScreen({
   state,
   dispatch,
   onOpenProject,
-  onOpenHelp
+  onOpenHelp,
+  onGuideTargetPress
 }: {
   state: AppState;
   dispatch: Dispatch<AppAction>;
   onOpenProject: (projectId: string) => void;
   onOpenHelp: () => void;
+  onGuideTargetPress: (targetId: GuideStep["targetId"]) => void;
 }) {
   const [actionOpen, setActionOpen] = useState(false);
   const [actionMode, setActionMode] = useState<"create" | "join">("create");
@@ -712,7 +791,13 @@ function ProjectListScreen({
             const sheets = state.competitions.filter((competition) => competition.projectId === project.id);
             const active = project.id === state.activeProjectId;
             const openButton = (
-              <Pressable style={styles.projectOpenButton} onPress={() => onOpenProject(project.id)}>
+              <Pressable
+                style={styles.projectOpenButton}
+                onPress={() => {
+                  onOpenProject(project.id);
+                  onGuideTargetPress("project-open");
+                }}
+              >
                 <Text style={styles.projectOpenText}>開く</Text>
               </Pressable>
             );
@@ -1007,6 +1092,10 @@ function phaseOptionLabel(option: PdfPhaseOption): string {
   }
 
   return "入場・退場";
+}
+
+function cloneAppState(state: AppState): AppState {
+  return JSON.parse(JSON.stringify(state)) as AppState;
 }
 
 function NudgeButton({

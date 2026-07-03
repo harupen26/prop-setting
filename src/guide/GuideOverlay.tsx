@@ -130,7 +130,8 @@ export function GuideOverlay({
   stepCount,
   onNext,
   onBack,
-  onSkip
+  onSkip,
+  practiceMode = false
 }: {
   visible: boolean;
   step: GuideStep | undefined;
@@ -139,6 +140,7 @@ export function GuideOverlay({
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
+  practiceMode?: boolean;
 }) {
   const registry = useContext(GuideContext);
   const measureTarget = registry?.measureTarget;
@@ -177,10 +179,11 @@ export function GuideOverlay({
 
   const bubbleStyle = getBubbleStyle(targetLayout, dimensions.width, dimensions.height, step.placement);
   const finalStep = stepIndex >= stepCount - 1;
+  const waitsForTargetPress = !!step.advanceOnTargetPress && !!step.targetId && !!targetLayout;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onSkip}>
-      <View style={styles.overlay}>
+      <View style={styles.overlay} pointerEvents={waitsForTargetPress ? "box-none" : "auto"}>
         <OverlayScrim layout={targetLayout} width={dimensions.width} height={dimensions.height} />
         {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
         <View style={[styles.bubble, bubbleStyle]}>
@@ -194,6 +197,12 @@ export function GuideOverlay({
           </View>
           <Text style={styles.title}>{step.title}</Text>
           <Text style={styles.body}>{step.body}</Text>
+          {practiceMode ? (
+            <Text style={styles.practiceText}>練習中: チュートリアル終了時に操作内容は元に戻ります。</Text>
+          ) : null}
+          {waitsForTargetPress ? (
+            <Text style={styles.actionHint}>{step.targetActionLabel ?? "ハイライトされた場所を押してください"}</Text>
+          ) : null}
           {!targetLayout && step.targetId ? (
             <Text style={styles.fallbackText}>対象のボタンが見つからないため、説明カードで表示しています。</Text>
           ) : null}
@@ -208,7 +217,7 @@ export function GuideOverlay({
                 </Pressable>
               ) : null}
               <Pressable style={styles.primaryButton} onPress={onNext}>
-                <Text style={styles.primaryButtonText}>{finalStep ? "完了" : "次へ"}</Text>
+                <Text style={styles.primaryButtonText}>{waitsForTargetPress ? "次へ進む" : finalStep ? "完了" : "次へ"}</Text>
               </Pressable>
             </View>
           </View>
@@ -382,6 +391,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "700"
+  },
+  practiceText: {
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "800",
+    backgroundColor: colors.surfaceSoft
+  },
+  actionHint: {
+    color: colors.primary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "900"
   },
   actions: {
     marginTop: 8,

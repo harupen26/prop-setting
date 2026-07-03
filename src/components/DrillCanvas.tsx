@@ -49,6 +49,7 @@ type Props = {
   onMove: (markerId: string, xSnap: number, ySnap: number) => void;
   onSelect: (markerId?: string) => void;
   onInteractionLockChange?: (locked: boolean) => void;
+  onGuidePlace?: () => void;
 };
 
 const HIT_RADIUS = 22;
@@ -64,7 +65,8 @@ export function DrillCanvas({
   onPlace,
   onMove,
   onSelect,
-  onInteractionLockChange
+  onInteractionLockChange,
+  onGuidePlace
 }: Props) {
   const [viewportWidth, setViewportWidth] = useState(340);
   const [zoom, setZoom] = useState(1);
@@ -99,7 +101,7 @@ export function DrillCanvas({
     height,
     viewportWidth
   });
-  const callbacksRef = useRef({ onPlace, onMove, onSelect, onInteractionLockChange });
+  const callbacksRef = useRef({ onPlace, onMove, onSelect, onInteractionLockChange, onGuidePlace });
   const [dragPreview, setDragPreview] = useState<DragPreview | undefined>();
   const pinchRef = useRef<PinchGesture | undefined>(undefined);
   const dragRef = useRef<{
@@ -153,8 +155,8 @@ export function DrillCanvas({
   }, [displayHeight, displayWidth, height, viewportWidth]);
 
   useEffect(() => {
-    callbacksRef.current = { onPlace, onMove, onSelect, onInteractionLockChange };
-  }, [onInteractionLockChange, onMove, onPlace, onSelect]);
+    callbacksRef.current = { onPlace, onMove, onSelect, onInteractionLockChange, onGuidePlace };
+  }, [onGuidePlace, onInteractionLockChange, onMove, onPlace, onSelect]);
 
   function updateInteractionLock(locked: boolean) {
     callbacksRef.current.onInteractionLockChange?.(locked);
@@ -265,6 +267,7 @@ export function DrillCanvas({
           const canvasPoint = viewportToCanvasPoint(locationX, locationY, panRef.current, zoomRef.current);
           const point = coordinateToSnapWithStep(canvasPoint.x, canvasPoint.y, sizeRef.current);
           callbacksRef.current.onPlace(point.xSnap, point.ySnap);
+          callbacksRef.current.onGuidePlace?.();
         }
 
         setDragPreview(undefined);
