@@ -1,4 +1,4 @@
-import { type Dispatch, type ReactNode, useMemo, useState } from "react";
+import { type Dispatch, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,7 @@ import {
   Copy,
   Eye,
   FileDown,
+  HelpCircle,
   LogIn,
   Plus,
   Settings,
@@ -35,6 +36,10 @@ import { ParticipantManagerPanel, ProjectSettingsPanel } from "./src/components/
 import { DrillCanvas } from "./src/components/DrillCanvas";
 import { SegmentedControl } from "./src/components/SegmentedControl";
 import { SidebarDrawer } from "./src/components/SidebarDrawer";
+import { GuideIntroPrompt, HelpPanel } from "./src/guide/HelpPanel";
+import { GuideOverlay, GuideProvider, GuideTarget } from "./src/guide/GuideOverlay";
+import { getGuideSteps, type GuideMode, type GuideStep } from "./src/guide/guideContent";
+import { useGuidePreferences } from "./src/guide/useGuidePreferences";
 import {
   buildPdfHtml,
   defaultPdfExportOptions,
@@ -59,11 +64,24 @@ import {
 import { isSupabaseConfigured } from "./src/lib/supabase";
 
 export default function App() {
+  return (
+    <GuideProvider>
+      <AppShell />
+    </GuideProvider>
+  );
+}
+
+function AppShell() {
   const { state, dispatch, hydrated } = usePersistentState();
+  const { preferences, guideHydrated, markIntroSeen, markGuideCompleted } = useGuidePreferences();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [projectListOpen, setProjectListOpen] = useState(true);
   const [participantManagerOpen, setParticipantManagerOpen] = useState(false);
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
+  const [activeGuideMode, setActiveGuideMode] = useState<GuideMode | undefined>();
+  const [guideIndex, setGuideIndex] = useState(0);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | undefined>();
   const [canvasInteractionLocked, setCanvasInteractionLocked] = useState(false);
   const [fineAdjustMode, setFineAdjustMode] = useState(false);
@@ -81,6 +99,16 @@ export default function App() {
     () => state.roles.filter((role) => isRoleVisible(state, role.id)).length,
     [state]
   );
+  const guideSteps = useMemo(() => (activeGuideMode ? getGuideSteps(activeGuideMode) : []), [activeGuideMode]);
+  const currentGuideStep = guideSteps[guideIndex];
+
+  useEffect(() => {
+    if (!hydrated || !guideHydrated || preferences.hasSeenIntroTutorial || activeGuideMode) {
+      return;
+    }
+
+    setIntroOpen(true);
+  }, [activeGuideMode, guideHydrated, hydrated, preferences.hasSeenIntroTutorial]);
 
   function placeMarker(xSnap: number, ySnap: number) {
     if (!selectedRole) {
@@ -142,7 +170,104 @@ export default function App() {
     setProjectListOpen(false);
     setParticipantManagerOpen(false);
     setProjectSettingsOpen(false);
+    setPdfOptionsOpen(false);
+    setDrawerOpen(false);
     setSelectedMarkerId(undefined);
+  }
+
+  function closeSecondaryPanels() {
+    setDrawerOpen(false);
+    setParticipantManagerOpen(false);
+    setProjectSettingsOpen(false);
+    setPdfOptionsOpen(false);
+  }
+
+  function prepareGuideStep(step: GuideStep | undefined) {
+    if (!step) {
+      return;
+    }
+
+    if (step.screen === "projectList") {
+      setProjectListOpen(true);
+      closeSecondaryPanels();
+      return;
+    }
+
+    setProjectListOpen(false);
+
+    if (step.screen === "participantManager") {
+      setDrawerOpen(false);
+      setProjectSettingsOpen(false);
+      setPdfOptionsOpen(false);
+      setParticipantManagerOpen(true);
+      return;
+    }
+
+    if (step.screen === "sidebar") {
+      setParticipantManagerOpen(false);
+      setProjectSettingsOpen(false);
+      setPdfOptionsOpen(false);
+      setDrawerOpen(true);
+      return;
+    }
+
+    if (step.screen === "projectSettings") {
+      setDrawerOpen(false);
+      setParticipantManagerOpen(false);
+      setPdfOptionsOpen(false);
+      setProjectSettingsOpen(true);
+      return;
+    }
+
+    if (step.screen === "pdf") {
+      setDrawerOpen(false);
+      setParticipantManagerOpen(false);
+      setProjectSettingsOpen(false);
+      openPdfOptions();
+      return;
+    }
+
+    closeSecondaryPanels();
+  }
+
+  function startGuide(mode: GuideMode) {
+    const nextSteps = getGuideSteps(mode);
+    setHelpOpen(false);
+    setIntroOpen(false);
+    setActiveGuideMode(mode);
+    setGuideIndex(0);
+    void markIntroSeen(mode);
+    prepareGuideStep(nextSteps[0]);
+  }
+
+  function stopGuide(completed: boolean) {
+    if (completed && activeGuideMode) {
+      void markGuideCompleted(activeGuideMode);
+    }
+    setActiveGuideMode(undefined);
+    setGuideIndex(0);
+  }
+
+  function showNextGuideStep() {
+    const nextIndex = guideIndex + 1;
+    if (nextIndex >= guideSteps.length) {
+      stopGuide(true);
+      return;
+    }
+
+    setGuideIndex(nextIndex);
+    prepareGuideStep(guideSteps[nextIndex]);
+  }
+
+  function showPreviousGuideStep() {
+    const nextIndex = Math.max(0, guideIndex - 1);
+    setGuideIndex(nextIndex);
+    prepareGuideStep(guideSteps[nextIndex]);
+  }
+
+  function dismissIntroPrompt() {
+    setIntroOpen(false);
+    void markIntroSeen();
   }
 
   const selectedMarker = state.markers.find((marker) => marker.id === selectedMarkerId);
@@ -161,7 +286,27 @@ export default function App() {
     });
   }
 
-  if (!hydrated) {
+  const guideLayers = (
+    <>
+      <HelpPanel visible={helpOpen} onClose={() => setHelpOpen(false)} onStartGuide={startGuide} />
+      <GuideIntroPrompt
+        visible={introOpen && !activeGuideMode}
+        onStartGuide={startGuide}
+        onDismiss={dismissIntroPrompt}
+      />
+      <GuideOverlay
+        visible={!!activeGuideMode}
+        step={currentGuideStep}
+        stepIndex={guideIndex}
+        stepCount={guideSteps.length}
+        onNext={showNextGuideStep}
+        onBack={showPreviousGuideStep}
+        onSkip={() => stopGuide(false)}
+      />
+    </>
+  );
+
+  if (!hydrated || !guideHydrated) {
     return (
       <SafeAreaView style={styles.loading}>
         <ActivityIndicator color={colors.text} />
@@ -171,7 +316,17 @@ export default function App() {
   }
 
   if (projectListOpen) {
-    return <ProjectListScreen state={state} dispatch={dispatch} onOpenProject={openProject} />;
+    return (
+      <>
+        <ProjectListScreen
+          state={state}
+          dispatch={dispatch}
+          onOpenProject={openProject}
+          onOpenHelp={() => setHelpOpen(true)}
+        />
+        {guideLayers}
+      </>
+    );
   }
 
   return (
@@ -179,29 +334,40 @@ export default function App() {
       <StatusBar style="dark" />
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={styles.appName}>手具セット管理</Text>
-          <Text style={styles.appMeta}>
+          <Text style={styles.appName} numberOfLines={1}>手具セット管理</Text>
+          <Text style={styles.appMeta} numberOfLines={1}>
             {activeProject?.name ?? "プロジェクト未設定"} / {activeCompetition?.name ?? "シート未設定"} / {activeParticipant.name}
           </Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
-            accessibilityLabel="参加者管理を開く"
-            style={styles.iconButton}
-            onPress={() => setParticipantManagerOpen(true)}
-          >
-            <Users size={20} color={colors.text} />
-          </Pressable>
-          <Pressable accessibilityLabel="PDF出力" style={styles.iconButton} onPress={openPdfOptions}>
-            <FileDown size={20} color={colors.text} />
-          </Pressable>
-          <Pressable
-            accessibilityLabel="プロジェクト設定を開く"
-            style={styles.iconButton}
-            onPress={() => setProjectSettingsOpen(true)}
-          >
-            <Settings size={20} color={colors.text} />
-          </Pressable>
+          <GuideTarget targetId="main-help">
+            <Pressable accessibilityLabel="使い方ガイドを開く" style={styles.iconButton} onPress={() => setHelpOpen(true)}>
+              <HelpCircle size={20} color={colors.text} />
+            </Pressable>
+          </GuideTarget>
+          <GuideTarget targetId="participant-manager-button">
+            <Pressable
+              accessibilityLabel="参加者管理を開く"
+              style={styles.iconButton}
+              onPress={() => setParticipantManagerOpen(true)}
+            >
+              <Users size={20} color={colors.text} />
+            </Pressable>
+          </GuideTarget>
+          <GuideTarget targetId="pdf-button">
+            <Pressable accessibilityLabel="PDF出力" style={styles.iconButton} onPress={openPdfOptions}>
+              <FileDown size={20} color={colors.text} />
+            </Pressable>
+          </GuideTarget>
+          <GuideTarget targetId="project-settings-button">
+            <Pressable
+              accessibilityLabel="プロジェクト設定を開く"
+              style={styles.iconButton}
+              onPress={() => setProjectSettingsOpen(true)}
+            >
+              <Settings size={20} color={colors.text} />
+            </Pressable>
+          </GuideTarget>
         </View>
       </View>
 
@@ -211,85 +377,95 @@ export default function App() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topControls}>
-          <SegmentedControl<Phase>
-            value={state.activePhase}
-            options={[
-              { value: "entry", label: "入場" },
-              { value: "exit", label: "退場" }
-            ]}
-            onChange={(phase) => {
-              setSelectedMarkerId(undefined);
-              dispatch({ type: "setPhase", phase });
-            }}
-          />
-          <SegmentedControl<ViewMode>
-            value={state.viewMode}
-            options={[
-              { value: "participant", label: "編集中" },
-              { value: "master", label: "統合表示" }
-            ]}
-            onChange={(viewMode) => {
-              setSelectedMarkerId(undefined);
-              dispatch({ type: "setViewMode", viewMode });
-            }}
-          />
+          <GuideTarget targetId="phase-tabs">
+            <SegmentedControl<Phase>
+              value={state.activePhase}
+              options={[
+                { value: "entry", label: "入場" },
+                { value: "exit", label: "退場" }
+              ]}
+              onChange={(phase) => {
+                setSelectedMarkerId(undefined);
+                dispatch({ type: "setPhase", phase });
+              }}
+            />
+          </GuideTarget>
+          <GuideTarget targetId="view-mode-tabs">
+            <SegmentedControl<ViewMode>
+              value={state.viewMode}
+              options={[
+                { value: "participant", label: "編集中" },
+                { value: "master", label: "統合表示" }
+              ]}
+              onChange={(viewMode) => {
+                setSelectedMarkerId(undefined);
+                dispatch({ type: "setViewMode", viewMode });
+              }}
+            />
+          </GuideTarget>
         </View>
 
-        <View style={styles.participantArea}>
-          <View style={styles.sectionHead}>
-            <Users size={17} color={colors.text} />
-            <Text style={styles.sectionTitle}>参加者</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.participantList}>
-            {state.participants.map((participant) => {
-              const active = participant.id === state.activeParticipantId;
-              return (
-                <Pressable
-                  key={participant.id}
-                  onPress={() => {
-                    setSelectedMarkerId(undefined);
-                    dispatch({ type: "setActiveParticipant", participantId: participant.id });
-                  }}
-                  style={[styles.participantChip, active && styles.participantChipActive]}
-                >
-                  <Text
-                    style={[styles.participantChipText, active && styles.participantChipTextActive]}
-                    numberOfLines={1}
-                  >
-                    {participant.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        <View style={styles.selectionBar}>
-          <View style={styles.selectedRoleLine}>
-            <View style={[styles.selectedSwatch, { backgroundColor: selectedRole?.color ?? colors.border }]} />
-            <View style={styles.selectedRoleTextWrap}>
-              <Text style={styles.selectedRoleLabel}>配置する手具</Text>
-              <Text style={styles.selectedRoleName}>{selectedRole?.name ?? "未選択"}</Text>
+        <GuideTarget targetId="participant-list">
+          <View style={styles.participantArea}>
+            <View style={styles.sectionHead}>
+              <Users size={17} color={colors.text} />
+              <Text style={styles.sectionTitle}>参加者</Text>
             </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.participantList}>
+              {state.participants.map((participant) => {
+                const active = participant.id === state.activeParticipantId;
+                return (
+                  <Pressable
+                    key={participant.id}
+                    onPress={() => {
+                      setSelectedMarkerId(undefined);
+                      dispatch({ type: "setActiveParticipant", participantId: participant.id });
+                    }}
+                    style={[styles.participantChip, active && styles.participantChipActive]}
+                  >
+                    <Text
+                      style={[styles.participantChipText, active && styles.participantChipTextActive]}
+                      numberOfLines={1}
+                    >
+                      {participant.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
-          <Pressable style={styles.secondaryButton} onPress={() => setDrawerOpen(true)}>
-            <Text style={styles.secondaryButtonText}>変更</Text>
-          </Pressable>
-        </View>
+        </GuideTarget>
 
-        <DrillCanvas
-          phase={state.activePhase}
-          markers={visibleMarkers}
-          roles={state.roles}
-          participants={state.participants}
-          selectedMarkerId={selectedMarkerId}
-          onPlace={placeMarker}
-          onMove={(markerId, xSnap, ySnap) =>
-            dispatch({ type: "moveMarker", markerId, xSnap, ySnap })
-          }
-          onSelect={setSelectedMarkerId}
-          onInteractionLockChange={setCanvasInteractionLocked}
-        />
+        <GuideTarget targetId="role-select">
+          <View style={styles.selectionBar}>
+            <View style={styles.selectedRoleLine}>
+              <View style={[styles.selectedSwatch, { backgroundColor: selectedRole?.color ?? colors.border }]} />
+              <View style={styles.selectedRoleTextWrap}>
+                <Text style={styles.selectedRoleLabel}>配置する手具</Text>
+                <Text style={styles.selectedRoleName}>{selectedRole?.name ?? "未選択"}</Text>
+              </View>
+            </View>
+            <Pressable style={styles.secondaryButton} onPress={() => setDrawerOpen(true)}>
+              <Text style={styles.secondaryButtonText}>変更</Text>
+            </Pressable>
+          </View>
+        </GuideTarget>
+
+        <GuideTarget targetId="drill-canvas">
+          <DrillCanvas
+            phase={state.activePhase}
+            markers={visibleMarkers}
+            roles={state.roles}
+            participants={state.participants}
+            selectedMarkerId={selectedMarkerId}
+            onPlace={placeMarker}
+            onMove={(markerId, xSnap, ySnap) =>
+              dispatch({ type: "moveMarker", markerId, xSnap, ySnap })
+            }
+            onSelect={setSelectedMarkerId}
+            onInteractionLockChange={setCanvasInteractionLocked}
+          />
+        </GuideTarget>
 
         <View style={styles.canvasHelp}>
           <Text style={styles.canvasHelpText}>
@@ -393,6 +569,7 @@ export default function App() {
         onClose={() => setPdfOptionsOpen(false)}
         onSave={() => exportPdf(pdfOptions)}
       />
+      {guideLayers}
     </SafeAreaView>
   );
 }
@@ -400,11 +577,13 @@ export default function App() {
 function ProjectListScreen({
   state,
   dispatch,
-  onOpenProject
+  onOpenProject,
+  onOpenHelp
 }: {
   state: AppState;
   dispatch: Dispatch<AppAction>;
   onOpenProject: (projectId: string) => void;
+  onOpenHelp: () => void;
 }) {
   const [actionOpen, setActionOpen] = useState(false);
   const [actionMode, setActionMode] = useState<"create" | "join">("create");
@@ -515,14 +694,29 @@ function ProjectListScreen({
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.projectListContent} showsVerticalScrollIndicator={false}>
         <View style={styles.projectListHeader}>
-          <Text style={styles.projectListTitle}>プロジェクト</Text>
-          <Text style={styles.projectListSubtitle}>編集するプロジェクトを選んでください。</Text>
+          <View style={styles.projectListHeaderTop}>
+            <View style={styles.projectListTitleBlock}>
+              <Text style={styles.projectListTitle}>プロジェクト</Text>
+              <Text style={styles.projectListSubtitle}>編集するプロジェクトを選んでください。</Text>
+            </View>
+            <GuideTarget targetId="main-help">
+              <Pressable accessibilityLabel="使い方ガイドを開く" style={styles.iconButton} onPress={onOpenHelp}>
+                <HelpCircle size={20} color={colors.text} />
+              </Pressable>
+            </GuideTarget>
+          </View>
         </View>
 
         <View style={styles.projectCards}>
-          {state.projects.map((project) => {
+          {state.projects.map((project, index) => {
             const sheets = state.competitions.filter((competition) => competition.projectId === project.id);
             const active = project.id === state.activeProjectId;
+            const openButton = (
+              <Pressable style={styles.projectOpenButton} onPress={() => onOpenProject(project.id)}>
+                <Text style={styles.projectOpenText}>開く</Text>
+              </Pressable>
+            );
+
             return (
               <View key={project.id} style={[styles.projectCard, active && styles.projectCardActive]}>
                 <View style={styles.projectCardTop}>
@@ -532,9 +726,7 @@ function ProjectListScreen({
                       {sheets.length}シート / 招待ID {project.shareId}
                     </Text>
                   </View>
-                  <Pressable style={styles.projectOpenButton} onPress={() => onOpenProject(project.id)}>
-                    <Text style={styles.projectOpenText}>開く</Text>
-                  </Pressable>
+                  {index === 0 ? <GuideTarget targetId="project-open">{openButton}</GuideTarget> : openButton}
                 </View>
                 <View style={styles.projectSheetPreview}>
                   {sheets.map((sheet) => (
@@ -548,9 +740,11 @@ function ProjectListScreen({
           })}
         </View>
       </ScrollView>
-      <Pressable accessibilityLabel="プロジェクトを追加" style={styles.projectFab} onPress={openProjectAction}>
-        <Plus size={24} color="#ffffff" />
-      </Pressable>
+      <GuideTarget targetId="project-add" style={styles.projectFabTarget}>
+        <Pressable accessibilityLabel="プロジェクトを追加" style={styles.projectFab} onPress={openProjectAction}>
+          <Plus size={24} color="#ffffff" />
+        </Pressable>
+      </GuideTarget>
 
       <Modal visible={actionOpen} transparent animationType="fade" onRequestClose={() => setActionOpen(false)}>
         <View style={styles.modalOverlay}>
@@ -719,21 +913,23 @@ function PdfOptionsModal({
             <Text style={styles.pdfPanelSubtitle}>対象とシートを選択</Text>
           </View>
 
-          <View style={styles.pdfSection}>
-            <Text style={styles.pdfSectionTitle}>出力対象</Text>
-            <View style={styles.optionRow}>
-              <OptionButton
-                active={options.targetMode === "master"}
-                label="統合表示"
-                onPress={() => setTargetMode("master")}
-              />
-              <OptionButton
-                active={options.targetMode === "participant"}
-                label="参加者別"
-                onPress={() => setTargetMode("participant")}
-              />
+          <GuideTarget targetId="pdf-target">
+            <View style={styles.pdfSection}>
+              <Text style={styles.pdfSectionTitle}>出力対象</Text>
+              <View style={styles.optionRow}>
+                <OptionButton
+                  active={options.targetMode === "master"}
+                  label="統合表示"
+                  onPress={() => setTargetMode("master")}
+                />
+                <OptionButton
+                  active={options.targetMode === "participant"}
+                  label="参加者別"
+                  onPress={() => setTargetMode("participant")}
+                />
+              </View>
             </View>
-          </View>
+          </GuideTarget>
 
           {options.targetMode === "participant" ? (
             <View style={styles.pdfSection}>
@@ -772,10 +968,12 @@ function PdfOptionsModal({
             <Pressable style={styles.pdfCancelButton} onPress={onClose}>
               <Text style={styles.pdfCancelText}>キャンセル</Text>
             </Pressable>
-            <Pressable style={styles.pdfSaveButton} onPress={onSave}>
-              <FileDown size={18} color="#ffffff" />
-              <Text style={styles.pdfSaveText}>保存</Text>
-            </Pressable>
+            <GuideTarget targetId="pdf-save">
+              <Pressable style={styles.pdfSaveButton} onPress={onSave}>
+                <FileDown size={18} color="#ffffff" />
+                <Text style={styles.pdfSaveText}>保存</Text>
+              </Pressable>
+            </GuideTarget>
           </View>
         </View>
       </View>
@@ -853,6 +1051,16 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingTop: 6
   },
+  projectListHeaderTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  projectListTitleBlock: {
+    flex: 1,
+    gap: 5
+  },
   projectListTitle: {
     color: colors.text,
     fontSize: 28,
@@ -927,10 +1135,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     backgroundColor: colors.surfaceSoft
   },
-  projectFab: {
+  projectFabTarget: {
     position: "absolute",
     right: 18,
-    bottom: 22,
+    bottom: 22
+  },
+  projectFab: {
     width: 58,
     height: 58,
     borderRadius: 29,
@@ -1081,6 +1291,7 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: "row",
+    flexShrink: 0,
     gap: 8
   },
   iconButton: {

@@ -33,6 +33,7 @@ import {
   getActiveProject,
   getProjectCompetitions
 } from "../selectors";
+import { GuideTarget } from "../guide/GuideOverlay";
 
 type ProjectSettingsProps = {
   visible: boolean;
@@ -157,7 +158,7 @@ export function ProjectSettingsPanel({
             />
           </View>
 
-          <View style={styles.section}>
+          <GuideTarget targetId="project-settings-list" style={styles.section}>
             <Text style={styles.sectionTitle}>シート / バージョン</Text>
             <View style={styles.sheetList}>
               {projectCompetitions.map((competition) => {
@@ -197,27 +198,31 @@ export function ProjectSettingsPanel({
             </View>
             <Text style={styles.helpText}>元シートは残し、コピー作成した更新版シートだけ削除できます。</Text>
 
-            <View style={styles.inlineForm}>
-              <TextInput
-                value={duplicateName}
-                onChangeText={setDuplicateName}
-                placeholder={duplicatePlaceholder}
-                placeholderTextColor={colors.textMuted}
-                style={styles.inlineInput}
-              />
-              <Pressable style={styles.actionButton} onPress={duplicateCompetition}>
-                <SquareStack size={17} color={colors.text} />
-                <Text style={styles.actionText}>コピー作成</Text>
-              </Pressable>
-            </View>
-          </View>
+            <GuideTarget targetId="project-settings-duplicate">
+              <View style={styles.inlineForm}>
+                <TextInput
+                  value={duplicateName}
+                  onChangeText={setDuplicateName}
+                  placeholder={duplicatePlaceholder}
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.inlineInput}
+                />
+                <Pressable style={styles.actionButton} onPress={duplicateCompetition}>
+                  <SquareStack size={17} color={colors.text} />
+                  <Text style={styles.actionText}>コピー作成</Text>
+                </Pressable>
+              </View>
+            </GuideTarget>
+          </GuideTarget>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>出力とデータ</Text>
-            <Pressable style={styles.primaryButton} onPress={onExportPdf}>
-              <FileDown size={18} color="#ffffff" />
-              <Text style={styles.primaryButtonText}>PDF出力</Text>
-            </Pressable>
+            <GuideTarget targetId="project-settings-pdf">
+              <Pressable style={styles.primaryButton} onPress={onExportPdf}>
+                <FileDown size={18} color="#ffffff" />
+                <Text style={styles.primaryButtonText}>PDF出力</Text>
+              </Pressable>
+            </GuideTarget>
             <Pressable style={styles.resetButton} onPress={resetData}>
               <RotateCcw size={16} color={colors.danger} />
               <Text style={styles.resetText}>初期データに戻す</Text>
@@ -293,7 +298,7 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.section}>
+          <GuideTarget targetId="participant-manager-invite" style={styles.section}>
             <Text style={styles.sectionTitle}>招待</Text>
             <Text style={styles.linkText}>招待ID: {shareId}</Text>
             <View style={styles.iconLine}>
@@ -306,97 +311,101 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
               <Copy size={17} color={colors.text} />
               <Text style={styles.actionText}>招待リンクをコピー</Text>
             </Pressable>
-          </View>
+          </GuideTarget>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>参加者一覧</Text>
-            <View style={styles.participantList}>
-              {state.participants
-                .slice()
-                .sort((a, b) => a.order - b.order)
-                .map((participant) => {
-                  const active = participant.id === state.activeParticipantId;
-                  return (
-                    <View key={participant.id} style={[styles.participantRow, active && styles.participantRowActive]}>
-                      <View style={styles.participantEditLine}>
-                        <Pressable
-                          accessibilityLabel={`${participant.name}を編集中にする`}
-                          style={[styles.participantNumber, active && styles.participantNumberActive]}
-                          onPress={() => dispatch({ type: "setActiveParticipant", participantId: participant.id })}
-                        >
-                          <Text style={[styles.participantNumberText, active && styles.participantNumberTextActive]}>
-                            {participant.order}
-                          </Text>
-                        </Pressable>
-                        <View style={styles.participantInputs}>
-                          <TextInput
-                            value={participant.name}
-                            onChangeText={(name) =>
-                              dispatch({ type: "updateParticipantName", participantId: participant.id, name })
-                            }
-                            placeholder="参加者名"
-                            placeholderTextColor={colors.textMuted}
-                            style={[styles.input, styles.participantNameInput]}
-                          />
-                          <TextInput
-                            value={participant.markerLabel}
-                            onChangeText={(markerLabel) =>
-                              dispatch({ type: "updateParticipantLabel", participantId: participant.id, markerLabel })
-                            }
-                            placeholder="丸内"
-                            placeholderTextColor={colors.textMuted}
-                            maxLength={4}
-                            style={[styles.input, styles.markerInput]}
-                          />
+            <GuideTarget targetId="participant-manager-list">
+              <View style={styles.participantList}>
+                {state.participants
+                  .slice()
+                  .sort((a, b) => a.order - b.order)
+                  .map((participant) => {
+                    const active = participant.id === state.activeParticipantId;
+                    return (
+                      <View key={participant.id} style={[styles.participantRow, active && styles.participantRowActive]}>
+                        <View style={styles.participantEditLine}>
+                          <Pressable
+                            accessibilityLabel={`${participant.name}を編集中にする`}
+                            style={[styles.participantNumber, active && styles.participantNumberActive]}
+                            onPress={() => dispatch({ type: "setActiveParticipant", participantId: participant.id })}
+                          >
+                            <Text style={[styles.participantNumberText, active && styles.participantNumberTextActive]}>
+                              {participant.order}
+                            </Text>
+                          </Pressable>
+                          <View style={styles.participantInputs}>
+                            <TextInput
+                              value={participant.name}
+                              onChangeText={(name) =>
+                                dispatch({ type: "updateParticipantName", participantId: participant.id, name })
+                              }
+                              placeholder="参加者名"
+                              placeholderTextColor={colors.textMuted}
+                              style={[styles.input, styles.participantNameInput]}
+                            />
+                            <TextInput
+                              value={participant.markerLabel}
+                              onChangeText={(markerLabel) =>
+                                dispatch({ type: "updateParticipantLabel", participantId: participant.id, markerLabel })
+                              }
+                              placeholder="丸内"
+                              placeholderTextColor={colors.textMuted}
+                              maxLength={4}
+                              style={[styles.input, styles.markerInput]}
+                            />
+                          </View>
+                        </View>
+                        <View style={styles.participantActionLine}>
+                          <Pressable
+                            accessibilityLabel={`${participant.name}を削除`}
+                            style={[
+                              styles.participantDeleteButton,
+                              state.participants.length <= 1 && styles.participantDeleteButtonDisabled
+                            ]}
+                            onPress={() => openDeleteParticipant(participant)}
+                          >
+                            <Trash2
+                              size={15}
+                              color={state.participants.length <= 1 ? colors.textMuted : colors.danger}
+                            />
+                            <Text
+                              style={[
+                                styles.participantDeleteText,
+                                state.participants.length <= 1 && styles.participantDeleteTextDisabled
+                              ]}
+                            >
+                              削除
+                            </Text>
+                          </Pressable>
                         </View>
                       </View>
-                      <View style={styles.participantActionLine}>
-                        <Pressable
-                          accessibilityLabel={`${participant.name}を削除`}
-                          style={[
-                            styles.participantDeleteButton,
-                            state.participants.length <= 1 && styles.participantDeleteButtonDisabled
-                          ]}
-                          onPress={() => openDeleteParticipant(participant)}
-                        >
-                          <Trash2
-                            size={15}
-                            color={state.participants.length <= 1 ? colors.textMuted : colors.danger}
-                          />
-                          <Text
-                            style={[
-                              styles.participantDeleteText,
-                              state.participants.length <= 1 && styles.participantDeleteTextDisabled
-                            ]}
-                          >
-                            削除
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  );
-                })}
-            </View>
+                    );
+                  })}
+              </View>
+            </GuideTarget>
 
-            <View style={styles.inlineForm}>
-              <TextInput
-                value={newParticipantName}
-                onChangeText={setNewParticipantName}
-                placeholder="新しい参加者名"
-                placeholderTextColor={colors.textMuted}
-                style={styles.inlineInput}
-              />
-              <Pressable style={styles.actionButton} onPress={addParticipant}>
-                <Plus size={17} color={colors.text} />
-                <Text style={styles.actionText}>追加</Text>
-              </Pressable>
-            </View>
+            <GuideTarget targetId="participant-manager-add">
+              <View style={styles.inlineForm}>
+                <TextInput
+                  value={newParticipantName}
+                  onChangeText={setNewParticipantName}
+                  placeholder="新しい参加者名"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.inlineInput}
+                />
+                <Pressable style={styles.actionButton} onPress={addParticipant}>
+                  <Plus size={17} color={colors.text} />
+                  <Text style={styles.actionText}>追加</Text>
+                </Pressable>
+              </View>
+            </GuideTarget>
             <Text style={styles.helpText}>
               名前を変えると丸内ラベルも自動更新されます。削除すると、その参加者の全シートの丸配置も削除されます。
             </Text>
           </View>
 
-          <View style={styles.section}>
+          <GuideTarget targetId="participant-manager-integrate" style={styles.section}>
             <Text style={styles.sectionTitle}>統合表示</Text>
             <View style={styles.statusLine}>
               <Text style={styles.statusText}>
@@ -426,7 +435,7 @@ export function ParticipantManagerPanel({ visible, state, dispatch, onClose }: P
               </Pressable>
             </View>
             <Text style={styles.helpText}>編集中の参加者: {activeParticipant.name}</Text>
-          </View>
+          </GuideTarget>
         </ScrollView>
         {deleteCandidate ? (
           <View style={styles.confirmOverlay}>

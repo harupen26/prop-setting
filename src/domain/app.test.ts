@@ -7,6 +7,7 @@ import { initialAppState } from "../data/seed";
 import { getVisibleMarkers } from "../selectors";
 import { appReducer } from "../state/appReducer";
 import type { Competition, Marker, Project } from "../types";
+import { getGuideSteps, helpSections } from "../guide/guideContent";
 
 describe("座標吸着", () => {
   it("キャンバス座標を0.3125m単位のスナップ座標へ変換する", () => {
@@ -50,6 +51,28 @@ describe("重なり表示", () => {
     const offset = getOverlapOffset({ xSnap: 120, ySnap: 64 }, { index: 1, count: 2 }, 10);
     expect(offset.dx).toBeGreaterThan(0);
     expect(Math.abs(offset.dy)).toBeLessThan(0.001);
+  });
+});
+
+describe("使い方ガイド", () => {
+  it("メンバー向けと管理者向けのチュートリアルを定義している", () => {
+    expect(getGuideSteps("member").length).toBeGreaterThan(0);
+    expect(getGuideSteps("admin").length).toBeGreaterThan(0);
+  });
+
+  it("各ステップは表示に必要な本文と画面を持つ", () => {
+    const steps = [...getGuideSteps("member"), ...getGuideSteps("admin")];
+
+    for (const step of steps) {
+      expect(step.title.trim()).not.toBe("");
+      expect(step.body.trim()).not.toBe("");
+      expect(step.screen).toBeTruthy();
+    }
+  });
+
+  it("ヘルプ画面のセクションを用意している", () => {
+    expect(helpSections.length).toBeGreaterThan(0);
+    expect(helpSections.every((section) => section.body.length > 0)).toBe(true);
   });
 });
 

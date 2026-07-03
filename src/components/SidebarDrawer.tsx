@@ -25,6 +25,7 @@ import type { AppAction } from "../state/appReducer";
 import type { AppState, ApparatusRole } from "../types";
 import { colors, radius, shadow } from "../theme";
 import { getSelectedRole } from "../selectors";
+import { GuideTarget } from "../guide/GuideOverlay";
 
 type Props = {
   visible: boolean;
@@ -150,75 +151,77 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
           </View>
 
           <ScrollView contentContainerStyle={styles.content}>
-            {state.folders
-              .slice()
-              .sort((a, b) => a.order - b.order)
-              .map((folderItem) => {
-                const folderRoles = rolesByFolder.get(folderItem.id) ?? [];
-                return (
-                  <View key={folderItem.id} style={styles.folderBlock}>
-                    <View style={styles.folderHeader}>
-                      <Pressable
-                        accessibilityLabel={`${folderItem.name}を開閉`}
-                        style={styles.folderTitle}
-                        onPress={() =>
-                          dispatch({ type: "toggleFolderCollapsed", folderId: folderItem.id })
-                        }
-                      >
-                        {folderItem.collapsed ? (
-                          <ChevronRight size={18} color={colors.text} />
-                        ) : (
-                          <ChevronDown size={18} color={colors.text} />
-                        )}
-                        <Folder size={17} color={colors.textMuted} />
-                        <Text style={styles.folderText}>{folderItem.name}</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityLabel={folderItem.visible ? "非表示にする" : "表示する"}
-                        style={styles.eyeButton}
-                        onPress={() =>
-                          dispatch({ type: "toggleFolderVisible", folderId: folderItem.id })
-                        }
-                      >
-                        {folderItem.visible ? (
-                          <Eye size={18} color={colors.text} />
-                        ) : (
-                          <EyeOff size={18} color={colors.textMuted} />
-                        )}
-                      </Pressable>
-                    </View>
+            <GuideTarget targetId="sidebar-role-list" style={styles.roleListGuideTarget}>
+              {state.folders
+                .slice()
+                .sort((a, b) => a.order - b.order)
+                .map((folderItem) => {
+                  const folderRoles = rolesByFolder.get(folderItem.id) ?? [];
+                  return (
+                    <View key={folderItem.id} style={styles.folderBlock}>
+                      <View style={styles.folderHeader}>
+                        <Pressable
+                          accessibilityLabel={`${folderItem.name}を開閉`}
+                          style={styles.folderTitle}
+                          onPress={() =>
+                            dispatch({ type: "toggleFolderCollapsed", folderId: folderItem.id })
+                          }
+                        >
+                          {folderItem.collapsed ? (
+                            <ChevronRight size={18} color={colors.text} />
+                          ) : (
+                            <ChevronDown size={18} color={colors.text} />
+                          )}
+                          <Folder size={17} color={colors.textMuted} />
+                          <Text style={styles.folderText}>{folderItem.name}</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityLabel={folderItem.visible ? "非表示にする" : "表示する"}
+                          style={styles.eyeButton}
+                          onPress={() =>
+                            dispatch({ type: "toggleFolderVisible", folderId: folderItem.id })
+                          }
+                        >
+                          {folderItem.visible ? (
+                            <Eye size={18} color={colors.text} />
+                          ) : (
+                            <EyeOff size={18} color={colors.textMuted} />
+                          )}
+                        </Pressable>
+                      </View>
 
-                    {!folderItem.collapsed &&
-                      folderRoles.map((role) => {
-                        const selected = role.id === state.selectedRoleId;
-                        return (
-                          <View key={role.id} style={[styles.roleRow, selected && styles.roleRowActive]}>
-                            <Pressable
-                              style={styles.roleMain}
-                              onPress={() => selectRole(role.id)}
-                            >
-                              <View style={[styles.swatch, { backgroundColor: role.color }]} />
-                              <Text style={styles.roleText} numberOfLines={2}>
-                                {role.name}
-                              </Text>
-                            </Pressable>
-                            <Pressable
-                              accessibilityLabel={role.visible ? "非表示にする" : "表示する"}
-                              style={styles.eyeButton}
-                              onPress={() => dispatch({ type: "toggleRoleVisible", roleId: role.id })}
-                            >
-                              {role.visible ? (
-                                <Eye size={18} color={colors.text} />
-                              ) : (
-                                <EyeOff size={18} color={colors.textMuted} />
-                              )}
-                            </Pressable>
-                          </View>
-                        );
-                      })}
-                  </View>
-                );
-              })}
+                      {!folderItem.collapsed &&
+                        folderRoles.map((role) => {
+                          const selected = role.id === state.selectedRoleId;
+                          return (
+                            <View key={role.id} style={[styles.roleRow, selected && styles.roleRowActive]}>
+                              <Pressable
+                                style={styles.roleMain}
+                                onPress={() => selectRole(role.id)}
+                              >
+                                <View style={[styles.swatch, { backgroundColor: role.color }]} />
+                                <Text style={styles.roleText} numberOfLines={2}>
+                                  {role.name}
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                accessibilityLabel={role.visible ? "非表示にする" : "表示する"}
+                                style={styles.eyeButton}
+                                onPress={() => dispatch({ type: "toggleRoleVisible", roleId: role.id })}
+                              >
+                                {role.visible ? (
+                                  <Eye size={18} color={colors.text} />
+                                ) : (
+                                  <EyeOff size={18} color={colors.textMuted} />
+                                )}
+                              </Pressable>
+                            </View>
+                          );
+                        })}
+                    </View>
+                  );
+                })}
+            </GuideTarget>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>フォルダー追加</Text>
@@ -236,7 +239,7 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
               </View>
             </View>
 
-            <View style={styles.section}>
+            <GuideTarget targetId="sidebar-add-role" style={styles.section}>
               <View style={styles.sectionTitleRow}>
                 <SwatchBook size={17} color={colors.text} />
                 <Text style={styles.sectionTitle}>手具追加</Text>
@@ -306,7 +309,7 @@ export function SidebarDrawer({ visible, state, dispatch, onClose }: Props) {
               <Pressable style={styles.primaryButton} onPress={addRole}>
                 <Text style={styles.primaryButtonText}>手具を追加</Text>
               </Pressable>
-            </View>
+            </GuideTarget>
           </ScrollView>
         </View>
       </View>
@@ -366,6 +369,9 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
     paddingBottom: 40
+  },
+  roleListGuideTarget: {
+    gap: 16
   },
   folderBlock: {
     gap: 6
