@@ -17,6 +17,7 @@ import {
 } from "../domain/grid";
 import { formatMarkerLabel, getReadableTextColor } from "../domain/labels";
 import { colors, radius } from "../theme";
+import { GuideTarget } from "../guide/GuideOverlay";
 
 type MarkerView = {
   marker: Marker;
@@ -50,6 +51,9 @@ type Props = {
   onSelect: (markerId?: string) => void;
   onInteractionLockChange?: (locked: boolean) => void;
   onGuidePlace?: () => void;
+  onGuideMove?: () => void;
+  onGuideZoomButton?: () => void;
+  onGuideZoomGesture?: () => void;
 };
 
 const HIT_RADIUS = 22;
@@ -66,7 +70,10 @@ export function DrillCanvas({
   onMove,
   onSelect,
   onInteractionLockChange,
-  onGuidePlace
+  onGuidePlace,
+  onGuideMove,
+  onGuideZoomButton,
+  onGuideZoomGesture
 }: Props) {
   const [viewportWidth, setViewportWidth] = useState(340);
   const [zoom, setZoom] = useState(1);
@@ -101,7 +108,16 @@ export function DrillCanvas({
     height,
     viewportWidth
   });
-  const callbacksRef = useRef({ onPlace, onMove, onSelect, onInteractionLockChange, onGuidePlace });
+  const callbacksRef = useRef({
+    onGuideMove,
+    onGuidePlace,
+    onGuideZoomButton,
+    onGuideZoomGesture,
+    onInteractionLockChange,
+    onMove,
+    onPlace,
+    onSelect
+  });
   const [dragPreview, setDragPreview] = useState<DragPreview | undefined>();
   const pinchRef = useRef<PinchGesture | undefined>(undefined);
   const dragRef = useRef<{
@@ -155,8 +171,26 @@ export function DrillCanvas({
   }, [displayHeight, displayWidth, height, viewportWidth]);
 
   useEffect(() => {
-    callbacksRef.current = { onPlace, onMove, onSelect, onInteractionLockChange, onGuidePlace };
-  }, [onGuidePlace, onInteractionLockChange, onMove, onPlace, onSelect]);
+    callbacksRef.current = {
+      onGuideMove,
+      onGuidePlace,
+      onGuideZoomButton,
+      onGuideZoomGesture,
+      onInteractionLockChange,
+      onMove,
+      onPlace,
+      onSelect
+    };
+  }, [
+    onGuideMove,
+    onGuidePlace,
+    onGuideZoomButton,
+    onGuideZoomGesture,
+    onInteractionLockChange,
+    onMove,
+    onPlace,
+    onSelect
+  ]);
 
   function updateInteractionLock(locked: boolean) {
     callbacksRef.current.onInteractionLockChange?.(locked);
@@ -168,6 +202,7 @@ export function DrillCanvas({
     const normalizedIndex = currentIndex >= 0 ? currentIndex : Math.max(0, fallbackIndex - 1);
     const nextIndex = Math.min(Math.max(normalizedIndex + direction, 0), ZOOM_LEVELS.length - 1);
     setZoom(ZOOM_LEVELS[nextIndex]);
+    callbacksRef.current.onGuideZoomButton?.();
   }
 
   const responder = useRef(
@@ -257,6 +292,7 @@ export function DrillCanvas({
         const point = viewportToCanvasPoint(locationX, locationY, panRef.current, zoomRef.current);
         const next = coordinateToSnapWithStep(point.x, point.y, sizeRef.current);
         callbacksRef.current.onMove(drag.markerId, next.xSnap, next.ySnap);
+        callbacksRef.current.onGuideMove?.();
       },
       onPanResponderRelease: (event) => {
         const drag = dragRef.current;
@@ -330,6 +366,7 @@ export function DrillCanvas({
     panRef.current = nextPan;
     setZoom(nextZoom);
     setPan(nextPan);
+    callbacksRef.current.onGuideZoomGesture?.();
   }
 
   const dragPreviewRole = dragPreview
@@ -343,7 +380,7 @@ export function DrillCanvas({
     <View style={styles.shell}>
       <View style={styles.directionRow}>
         <Text style={styles.directionText}>前</Text>
-        <View style={styles.zoomControls}>
+        <GuideTarget targetId="drill-zoom-buttons" style={styles.zoomControls}>
           <Pressable
             accessibilityLabel="縮小"
             disabled={zoom <= ZOOM_LEVELS[0]}
@@ -367,7 +404,7 @@ export function DrillCanvas({
               color={zoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1] ? colors.textMuted : colors.text}
             />
           </Pressable>
-        </View>
+        </GuideTarget>
       </View>
       <View
         {...responder.panHandlers}

@@ -130,10 +130,11 @@ function AppShell() {
       return;
     }
 
+    const markerId = `marker-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     dispatch({
       type: "placeMarker",
       marker: {
-        id: `marker-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: markerId,
         competitionId: state.activeCompetitionId,
         participantId: state.activeParticipantId,
         roleId: selectedRole.id,
@@ -143,6 +144,7 @@ function AppShell() {
         updatedAt: new Date().toISOString()
       }
     });
+    setSelectedMarkerId(markerId);
   }
 
   async function exportPdf(options: PdfExportOptions) {
@@ -300,6 +302,14 @@ function AppShell() {
     setTimeout(showNextGuideStep, 180);
   }
 
+  function completeGuideStep(stepId: string) {
+    if (currentGuideStep?.id !== stepId) {
+      return;
+    }
+
+    setTimeout(showNextGuideStep, 180);
+  }
+
   function showNextGuideStep() {
     const nextIndex = guideIndex + 1;
     if (nextIndex >= guideSteps.length) {
@@ -351,6 +361,7 @@ function AppShell() {
     />
   );
   const guideOverlayInSidebar = currentGuideStep?.screen === "sidebar" && drawerOpen;
+  const guideOverlayInProjectAction = isProjectActionGuideTarget(currentGuideStep?.targetId);
   const guideLayers = (
     <>
       <HelpPanel visible={helpOpen} onClose={() => setHelpOpen(false)} onStartGuide={startGuide} />
@@ -359,7 +370,7 @@ function AppShell() {
         onStartGuide={startGuide}
         onDismiss={dismissIntroPrompt}
       />
-      {guideOverlayInSidebar ? null : guideOverlay}
+      {guideOverlayInSidebar || guideOverlayInProjectAction ? null : guideOverlay}
     </>
   );
 
@@ -381,6 +392,7 @@ function AppShell() {
           onOpenProject={openProject}
           onOpenHelp={() => setHelpOpen(true)}
           onGuideTargetPress={completeGuideTarget}
+          guideOverlay={guideOverlayInProjectAction ? guideOverlay : undefined}
         />
         {guideLayers}
       </View>
@@ -544,7 +556,10 @@ function AppShell() {
             }
             onSelect={setSelectedMarkerId}
             onInteractionLockChange={setCanvasInteractionLocked}
-            onGuidePlace={() => completeGuideTarget("drill-canvas")}
+            onGuidePlace={() => completeGuideStep("member-drill")}
+            onGuideMove={() => completeGuideStep("member-drag-marker")}
+            onGuideZoomButton={() => completeGuideStep("member-zoom-buttons")}
+            onGuideZoomGesture={() => completeGuideStep("member-zoom-gesture")}
           />
         </GuideTarget>
 
@@ -574,24 +589,36 @@ function AppShell() {
               </Pressable>
             </View>
             <View style={styles.adjustRow}>
-              <View style={styles.nudgePad}>
+              <GuideTarget targetId="marker-nudge-controls" style={styles.nudgePad}>
                 <View style={styles.nudgePadLine}>
-                  <NudgeButton label="上へ" onPress={() => nudgeSelectedMarker(0, -nudgeStep)}>
+                  <NudgeButton label="上へ" onPress={() => {
+                    nudgeSelectedMarker(0, -nudgeStep);
+                    completeGuideStep("member-nudge-marker");
+                  }}>
                     <ArrowUp size={17} color={colors.text} />
                   </NudgeButton>
                 </View>
                 <View style={styles.nudgePadLine}>
-                  <NudgeButton label="左へ" onPress={() => nudgeSelectedMarker(-nudgeStep, 0)}>
+                  <NudgeButton label="左へ" onPress={() => {
+                    nudgeSelectedMarker(-nudgeStep, 0);
+                    completeGuideStep("member-nudge-marker");
+                  }}>
                     <ArrowLeft size={17} color={colors.text} />
                   </NudgeButton>
-                  <NudgeButton label="下へ" onPress={() => nudgeSelectedMarker(0, nudgeStep)}>
+                  <NudgeButton label="下へ" onPress={() => {
+                    nudgeSelectedMarker(0, nudgeStep);
+                    completeGuideStep("member-nudge-marker");
+                  }}>
                     <ArrowDown size={17} color={colors.text} />
                   </NudgeButton>
-                  <NudgeButton label="右へ" onPress={() => nudgeSelectedMarker(nudgeStep, 0)}>
+                  <NudgeButton label="右へ" onPress={() => {
+                    nudgeSelectedMarker(nudgeStep, 0);
+                    completeGuideStep("member-nudge-marker");
+                  }}>
                     <ArrowRight size={17} color={colors.text} />
                   </NudgeButton>
                 </View>
-              </View>
+              </GuideTarget>
               <Pressable
                 accessibilityLabel="丸を削除"
                 style={styles.deleteButton}
@@ -662,13 +689,15 @@ function ProjectListScreen({
   dispatch,
   onOpenProject,
   onOpenHelp,
-  onGuideTargetPress
+  onGuideTargetPress,
+  guideOverlay
 }: {
   state: AppState;
   dispatch: Dispatch<AppAction>;
   onOpenProject: (projectId: string) => void;
   onOpenHelp: () => void;
   onGuideTargetPress: (targetId: GuideStep["targetId"]) => void;
+  guideOverlay?: ReactNode;
 }) {
   const [actionOpen, setActionOpen] = useState(false);
   const [actionMode, setActionMode] = useState<"create" | "join">("create");
@@ -682,6 +711,7 @@ function ProjectListScreen({
     setCreateInviteId(generateInviteId(""));
     setJoinInviteId("");
     setActionOpen(true);
+    onGuideTargetPress("project-add");
   }
 
   function isDuplicateInviteId(inviteId: string) {
@@ -749,6 +779,7 @@ function ProjectListScreen({
     if (existingProject) {
       setActionOpen(false);
       onOpenProject(existingProject.id);
+      onGuideTargetPress("project-join-submit");
       return;
     }
 
@@ -772,6 +803,7 @@ function ProjectListScreen({
     });
     setActionOpen(false);
     onOpenProject(projectId);
+    onGuideTargetPress("project-join-submit");
   }
 
   return (
@@ -846,14 +878,21 @@ function ProjectListScreen({
               <Text style={styles.projectActionSubtitle}>作成するか、招待IDで参加します。</Text>
             </View>
 
-            <SegmentedControl<"create" | "join">
-              value={actionMode}
-              options={[
-                { value: "create", label: "作成" },
-                { value: "join", label: "参加" }
-              ]}
-              onChange={setActionMode}
-            />
+            <GuideTarget targetId="project-action-mode">
+              <SegmentedControl<"create" | "join">
+                value={actionMode}
+                options={[
+                  { value: "create", label: "作成" },
+                  { value: "join", label: "参加" }
+                ]}
+                onChange={(mode) => {
+                  setActionMode(mode);
+                  if (mode === "join") {
+                    onGuideTargetPress("project-action-mode");
+                  }
+                }}
+              />
+            </GuideTarget>
 
             {actionMode === "create" ? (
               <View style={styles.projectActionSection}>
@@ -905,28 +944,39 @@ function ProjectListScreen({
             ) : (
               <View style={styles.projectActionSection}>
                 <Text style={styles.projectActionLabel}>招待ID</Text>
-                <TextInput
-                  value={joinInviteId}
-                  onChangeText={(value) => setJoinInviteId(formatInviteIdInput(value))}
-                  placeholder="招待IDを入力"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  style={styles.projectActionInput}
-                />
+                <GuideTarget targetId="project-join-invite-input">
+                  <TextInput
+                    value={joinInviteId}
+                    onChangeText={(value) => {
+                      const formatted = formatInviteIdInput(value);
+                      setJoinInviteId(formatted);
+                      if (formatted === SAMPLE_INVITE_ID) {
+                        onGuideTargetPress("project-join-invite-input");
+                      }
+                    }}
+                    placeholder="招待IDを入力"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    style={styles.projectActionInput}
+                  />
+                </GuideTarget>
                 <Text style={styles.projectActionHelp}>{INVITE_ID_HELP}</Text>
                 <View style={styles.projectActionButtons}>
                   <Pressable style={styles.projectCancelButton} onPress={() => setActionOpen(false)}>
                     <Text style={styles.projectCancelText}>キャンセル</Text>
                   </Pressable>
-                  <Pressable style={styles.projectPrimaryButton} onPress={joinProject}>
-                    <LogIn size={17} color="#ffffff" />
-                    <Text style={styles.projectPrimaryText}>参加</Text>
-                  </Pressable>
+                  <GuideTarget targetId="project-join-submit">
+                    <Pressable style={styles.projectPrimaryButton} onPress={joinProject}>
+                      <LogIn size={17} color="#ffffff" />
+                      <Text style={styles.projectPrimaryText}>参加</Text>
+                    </Pressable>
+                  </GuideTarget>
                 </View>
               </View>
             )}
           </View>
+          {guideOverlay}
         </View>
       </Modal>
     </SafeAreaView>
@@ -935,6 +985,7 @@ function ProjectListScreen({
 
 const INVITE_ID_HELP = "使える文字: 半角英数字・ハイフン(-)・アンダーバー(_) / 3〜24文字";
 const INVITE_ID_PATTERN = /^[A-Z0-9_-]{3,24}$/;
+const SAMPLE_INVITE_ID = "YR-2026";
 
 function formatInviteIdInput(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase().slice(0, 24);
@@ -948,6 +999,14 @@ function generateInviteId(seed: string): string {
   const base = formatInviteIdInput(seed).replace(/^[-_]+|[-_]+$/g, "").slice(0, 12) || "PROJECT";
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `${base}-${suffix}`.slice(0, 24);
+}
+
+function isProjectActionGuideTarget(targetId: GuideStep["targetId"]): boolean {
+  return (
+    targetId === "project-action-mode" ||
+    targetId === "project-join-invite-input" ||
+    targetId === "project-join-submit"
+  );
 }
 
 function normalizePdfOptions(options: PdfExportOptions, fallbackParticipantId: string): PdfExportOptions {
@@ -1622,6 +1681,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
+    position: "relative",
     alignItems: "center",
     justifyContent: "center",
     padding: 16,

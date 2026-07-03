@@ -179,14 +179,14 @@ export function GuideOverlay({
 
   const bubbleStyle = getBubbleStyle(targetLayout, dimensions.width, dimensions.height, step.placement);
   const finalStep = stepIndex >= stepCount - 1;
-  const waitsForTargetPress = !!step.advanceOnTargetPress && !!step.targetId && !!targetLayout;
+  const waitsForTargetAction = !!step.advanceOnTargetPress && !!step.targetId;
   const content = (
-    <View style={waitsForTargetPress ? styles.floatingOverlay : styles.overlay} pointerEvents={waitsForTargetPress ? "box-none" : "auto"}>
+    <View style={waitsForTargetAction ? styles.floatingOverlay : styles.overlay} pointerEvents={waitsForTargetAction ? "box-none" : "auto"}>
       <OverlayScrim
         layout={targetLayout}
         width={dimensions.width}
         height={dimensions.height}
-        allowTargetPress={waitsForTargetPress}
+        allowTargetPress={waitsForTargetAction}
       />
       {targetLayout ? <View pointerEvents="none" style={getHighlightStyle(targetLayout)} /> : null}
       <View style={[styles.bubble, bubbleStyle]}>
@@ -203,7 +203,7 @@ export function GuideOverlay({
         {practiceMode ? (
           <Text style={styles.practiceText}>練習中: チュートリアル終了時に操作内容は元に戻ります。</Text>
         ) : null}
-        {waitsForTargetPress ? (
+        {waitsForTargetAction ? (
           <Text style={styles.actionHint}>{step.targetActionLabel ?? "ハイライトされた場所を押してください"}</Text>
         ) : null}
         {!targetLayout && step.targetId ? (
@@ -219,7 +219,7 @@ export function GuideOverlay({
                 <Text style={styles.secondaryButtonText}>戻る</Text>
               </Pressable>
             ) : null}
-            {!waitsForTargetPress ? (
+            {!waitsForTargetAction ? (
               <Pressable style={styles.primaryButton} onPress={onNext}>
                 <Text style={styles.primaryButtonText}>{finalStep ? "完了" : "次へ"}</Text>
               </Pressable>
@@ -230,7 +230,7 @@ export function GuideOverlay({
     </View>
   );
 
-  if (waitsForTargetPress) {
+  if (waitsForTargetAction) {
     return content;
   }
 

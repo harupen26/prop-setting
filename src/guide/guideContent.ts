@@ -12,6 +12,9 @@ export type GuidePlacement = "top" | "bottom" | "center";
 
 export type GuideTargetId =
   | "project-add"
+  | "project-action-mode"
+  | "project-join-invite-input"
+  | "project-join-submit"
   | "project-open"
   | "main-help"
   | "participant-manager-button"
@@ -22,6 +25,8 @@ export type GuideTargetId =
   | "participant-list"
   | "role-select"
   | "drill-canvas"
+  | "drill-zoom-buttons"
+  | "marker-nudge-controls"
   | "sidebar-role-list"
   | "sidebar-add-role"
   | "participant-manager-invite"
@@ -67,17 +72,39 @@ export const memberGuideSteps: GuideStep[] = [
     screen: "projectList",
     targetId: "project-add",
     title: "プロジェクトに参加",
-    body: "右下の＋から、招待IDで参加できます。練習用に自分でプロジェクトを作ることもできます。"
+    body: "右下の＋から、招待IDで参加できます。まず＋を押して参加画面を開きます。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "右下の＋を押してください"
   },
   {
-    id: "member-project-open",
+    id: "member-project-action-mode",
     mode: "member",
     screen: "projectList",
-    targetId: "project-open",
-    title: "プロジェクトを開く",
-    body: "使うプロジェクトの「開く」を押して、手具を置く編集画面に入ってみましょう。",
+    targetId: "project-action-mode",
+    title: "招待IDで参加を選ぶ",
+    body: "プロジェクト追加では「作成」と「参加」を選べます。今回は参加を押します。",
     advanceOnTargetPress: true,
-    targetActionLabel: "「開く」を押してください"
+    targetActionLabel: "「参加」を押してください"
+  },
+  {
+    id: "member-project-join-input",
+    mode: "member",
+    screen: "projectList",
+    targetId: "project-join-invite-input",
+    title: "招待IDを入力",
+    body: "サンプル招待IDとして YR-2026 を入力します。入力しても最後に元へ戻ります。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "YR-2026 と入力してください"
+  },
+  {
+    id: "member-project-join-submit",
+    mode: "member",
+    screen: "projectList",
+    targetId: "project-join-submit",
+    title: "プロジェクトに参加",
+    body: "参加ボタンを押すと、既存のサンプルプロジェクトを開いて練習を始めます。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "「参加」を押してください"
   },
   {
     id: "member-participant",
@@ -120,6 +147,46 @@ export const memberGuideSteps: GuideStep[] = [
     targetActionLabel: "ドリルをタップしてください"
   },
   {
+    id: "member-zoom-buttons",
+    mode: "member",
+    screen: "main",
+    targetId: "drill-zoom-buttons",
+    title: "ボタンで拡大縮小",
+    body: "＋と−でドリルシートを拡大縮小できます。ドラッグしづらい時は、まずボタンで倍率を調整します。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "＋か−を押してください"
+  },
+  {
+    id: "member-zoom-gesture",
+    mode: "member",
+    screen: "main",
+    targetId: "drill-canvas",
+    title: "指で拡大縮小",
+    body: "スマホでは二本指のピンチアウト / ピンチインでも拡大縮小できます。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "二本指で拡大縮小してください"
+  },
+  {
+    id: "member-drag-marker",
+    mode: "member",
+    screen: "main",
+    targetId: "drill-canvas",
+    title: "丸をドラッグで移動",
+    body: "置いた丸を指でドラッグすると移動できます。位置は格子に吸着します。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "丸をドラッグしてください"
+  },
+  {
+    id: "member-nudge-marker",
+    mode: "member",
+    screen: "main",
+    targetId: "marker-nudge-controls",
+    title: "矢印で細かく調整",
+    body: "ドラッグが難しい時は、丸を選んだ状態で矢印ボタンを押して位置を調整できます。",
+    advanceOnTargetPress: true,
+    targetActionLabel: "矢印を1回押してください"
+  },
+  {
     id: "member-phase",
     mode: "member",
     screen: "main",
@@ -128,6 +195,14 @@ export const memberGuideSteps: GuideStep[] = [
     body: "入場と退場は別々に入力します。タブを押して切り替えを試したら完了です。",
     advanceOnTargetPress: true,
     targetActionLabel: "入場 / 退場を押してください"
+  },
+  {
+    id: "member-finished",
+    mode: "member",
+    screen: "main",
+    title: "チュートリアル完了",
+    body: "これでチュートリアルは以上です。操作方法でわからないことがあれば、画面上の？ボタンからいつでも見直せます。",
+    placement: "center"
   }
 ];
 
@@ -200,7 +275,15 @@ export const adminGuideSteps: GuideStep[] = [
     screen: "sidebar",
     targetId: "sidebar-add-role",
     title: "手具を追加",
-    body: "手具名、色、フォルダーを設定して追加します。表示 / 非表示もこの画面で管理できます。"
+    body: "手具名、色、フォルダーを設定して追加します。自由色もここから選べます。"
+  },
+  {
+    id: "admin-role-visibility",
+    mode: "admin",
+    screen: "sidebar",
+    targetId: "sidebar-role-list",
+    title: "表示 / 非表示を切り替える",
+    body: "手具やフォルダーの目アイコンを押すと、ドリル上に表示するかどうかを切り替えられます。"
   },
   {
     id: "admin-integrated",
