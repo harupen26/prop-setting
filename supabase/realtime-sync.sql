@@ -9,6 +9,8 @@ create index if not exists project_snapshots_updated_at_idx on public.project_sn
 
 alter table public.project_snapshots enable row level security;
 
+grant select, insert, update on public.project_snapshots to anon, authenticated;
+
 drop policy if exists project_snapshots_select on public.project_snapshots;
 drop policy if exists project_snapshots_insert on public.project_snapshots;
 drop policy if exists project_snapshots_update on public.project_snapshots;
