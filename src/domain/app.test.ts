@@ -6,6 +6,7 @@ import { replaceParticipantMarkers } from "./merge";
 import { initialAppState } from "../data/seed";
 import { getVisibleMarkers } from "../selectors";
 import { appReducer } from "../state/appReducer";
+import { buildProjectSyncPayload, mergeProjectSyncPayload } from "../state/projectSync";
 import type { Competition, Marker, Project } from "../types";
 import { getGuideSteps, helpSections } from "../guide/guideContent";
 
@@ -300,6 +301,44 @@ describe("統合", () => {
 
     expect(result.activeProjectId).toBe(initialAppState.activeProjectId);
     expect(result.projects.some((item) => item.id === "project-duplicate")).toBe(false);
+  });
+});
+
+describe("DB同期", () => {
+  it("同じ招待IDの仮プロジェクトをDB側のプロジェクトに置き換える", () => {
+    const local = appReducer(initialAppState, {
+      type: "joinProject",
+      project: project("project-local", "参加中", "SYNC2026"),
+      competition: competition("competition-local", "project-local", "ローカル")
+    });
+    const remoteProject = project("project-remote", "共有プロジェクト", "SYNC2026");
+    const remoteCompetition = competition("competition-remote", "project-remote", "共有シート");
+    const remoteMarker: Marker = {
+      ...marker("remote-marker", "participant-1", 42),
+      competitionId: remoteCompetition.id
+    };
+    const remoteState = {
+      ...initialAppState,
+      activeProjectId: remoteProject.id,
+      activeCompetitionId: remoteCompetition.id,
+      projects: [remoteProject],
+      competitions: [remoteCompetition],
+      markers: [remoteMarker],
+      integratedParticipantIdsByCompetition: {
+        [remoteCompetition.id]: ["participant-1"]
+      }
+    };
+    const payload = buildProjectSyncPayload(remoteState);
+
+    expect(payload).toBeTruthy();
+    const merged = mergeProjectSyncPayload(local, payload!);
+
+    expect(merged.activeProjectId).toBe(remoteProject.id);
+    expect(merged.projects.some((item) => item.id === "project-local")).toBe(false);
+    expect(merged.projects.some((item) => item.id === remoteProject.id)).toBe(true);
+    expect(merged.competitions.some((item) => item.id === "competition-local")).toBe(false);
+    expect(merged.markers.some((item) => item.competitionId === "competition-local")).toBe(false);
+    expect(merged.markers.some((item) => item.id === remoteMarker.id)).toBe(true);
   });
 });
 

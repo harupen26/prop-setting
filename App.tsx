@@ -53,6 +53,7 @@ import {
 import { SNAP, clamp } from "./src/domain/grid";
 import type { AppAction } from "./src/state/appReducer";
 import { usePersistentState } from "./src/state/usePersistentState";
+import { useProjectRealtimeSync } from "./src/state/useProjectRealtimeSync";
 import { colors, radius } from "./src/theme";
 import type { AppState, Phase, ViewMode } from "./src/types";
 import {
@@ -63,7 +64,6 @@ import {
   getVisibleMarkers,
   isRoleVisible
 } from "./src/selectors";
-import { isSupabaseConfigured } from "./src/lib/supabase";
 
 type GuideUiSnapshot = {
   canvasInteractionLocked: boolean;
@@ -126,6 +126,10 @@ function AppShell() {
   );
   const guideSteps = useMemo(() => (activeGuideMode ? getGuideSteps(activeGuideMode) : []), [activeGuideMode]);
   const currentGuideStep = guideSteps[guideIndex];
+  const projectSync = useProjectRealtimeSync(state, dispatch, {
+    hydrated,
+    paused: !!activeGuideMode
+  });
   const activeGuideTargetId =
     currentGuideStep?.advanceOnTargetPress && currentGuideStep.targetId ? currentGuideStep.targetId : undefined;
 
@@ -749,7 +753,7 @@ function AppShell() {
             <Text style={styles.sectionTitle}>表示中の手具</Text>
           </View>
           <Text style={styles.legendSummaryText}>
-            {visibleRoleCount}種類を表示中 / Supabase接続: {isSupabaseConfigured ? "設定済み" : "未設定"}
+            {visibleRoleCount}種類を表示中 / {projectSync.label}
           </Text>
         </View>
 
