@@ -124,7 +124,7 @@ export function mergeProjectSyncPayload(current: AppState, payload: ProjectSyncP
   };
   const participants = payload.participants.length ? payload.participants : current.participants;
   const folders = payload.folders.length ? payload.folders : current.folders;
-  const roles = payload.roles.length ? payload.roles : current.roles;
+  const roles = payload.roles;
   const nextActiveProjectId = activeProjectMatches ? incomingProject.id : current.activeProjectId;
   const activeCompetitionStillExists = competitions.some(
     (competition) => competition.id === current.activeCompetitionId

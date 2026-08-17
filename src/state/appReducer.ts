@@ -23,6 +23,7 @@ export type AppAction =
   | { type: "toggleFolderCollapsed"; folderId: string }
   | { type: "addFolder"; folder: RoleFolder }
   | { type: "addRole"; role: ApparatusRole }
+  | { type: "deleteRoles"; roleIds: string[] }
   | { type: "addParticipant"; name: string }
   | { type: "deleteParticipant"; participantId: string }
   | { type: "updateParticipantName"; participantId: string; name: string }
@@ -119,6 +120,24 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, folders: [...state.folders, action.folder] };
     case "addRole":
       return { ...state, roles: [...state.roles, action.role], selectedRoleId: action.role.id };
+    case "deleteRoles": {
+      const roleIds = new Set(action.roleIds);
+      if (roleIds.size === 0) {
+        return state;
+      }
+
+      const roles = state.roles.filter((role) => !roleIds.has(role.id));
+      if (roles.length === state.roles.length) {
+        return state;
+      }
+
+      return {
+        ...state,
+        selectedRoleId: roleIds.has(state.selectedRoleId) ? roles[0]?.id ?? "" : state.selectedRoleId,
+        roles,
+        markers: state.markers.filter((marker) => !roleIds.has(marker.roleId))
+      };
+    }
     case "addParticipant": {
       const name = action.name.trim();
       if (!name) {
@@ -344,7 +363,7 @@ function normalizeState(state: AppState): AppState {
     competitions,
     participants: state.participants?.length ? state.participants : initialAppState.participants,
     folders: state.folders?.length ? state.folders : initialAppState.folders,
-    roles: state.roles?.length ? state.roles : initialAppState.roles,
+    roles: state.roles ?? initialAppState.roles,
     markers: state.markers ?? [],
     integratedParticipantIdsByCompetition: state.integratedParticipantIdsByCompetition ?? {}
   };

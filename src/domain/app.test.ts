@@ -178,6 +178,37 @@ describe("統合", () => {
     ]);
   });
 
+  it("選択した手具を削除すると関連する丸も削除し次の手具を選ぶ", () => {
+    const state = {
+      ...initialAppState,
+      selectedRoleId: "role-m1",
+      markers: [
+        { ...marker("delete-marker", "participant-1", 10), roleId: "role-m1" },
+        { ...marker("keep-marker", "participant-1", 20), roleId: "role-rifle" }
+      ]
+    };
+
+    const result = appReducer(state, { type: "deleteRoles", roleIds: ["role-m1"] });
+
+    expect(result.roles.some((role) => role.id === "role-m1")).toBe(false);
+    expect(result.markers.map((item) => item.id)).toEqual(["keep-marker"]);
+    expect(result.selectedRoleId).toBe("role-rifle");
+  });
+
+  it("すべての手具を削除しても空の手具一覧を保持する", () => {
+    const result = appReducer(initialAppState, {
+      type: "deleteRoles",
+      roleIds: initialAppState.roles.map((role) => role.id)
+    });
+
+    expect(result.roles).toEqual([]);
+    expect(result.markers).toEqual([]);
+    expect(result.selectedRoleId).toBe("");
+
+    const hydrated = appReducer(initialAppState, { type: "hydrate", state: result });
+    expect(hydrated.roles).toEqual([]);
+  });
+
   it("参加者を追加すると編集中の参加者として選ばれ丸内ラベルも作られる", () => {
     const result = appReducer(initialAppState, { type: "addParticipant", name: "31. かな" });
     const added = result.participants[result.participants.length - 1];

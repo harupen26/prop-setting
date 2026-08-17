@@ -19,7 +19,7 @@ export function getActiveParticipant(state: AppState): Participant {
   );
 }
 
-export function getSelectedRole(state: AppState): ApparatusRole {
+export function getSelectedRole(state: AppState): ApparatusRole | undefined {
   return state.roles.find((role) => role.id === state.selectedRoleId) ?? state.roles[0];
 }
 

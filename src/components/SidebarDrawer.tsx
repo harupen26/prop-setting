@@ -10,6 +10,7 @@ import {
   View
 } from "react-native";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -17,6 +18,7 @@ import {
   Folder,
   Plus,
   SwatchBook,
+  Trash2,
   X
 } from "lucide-react-native";
 import Svg, { Rect } from "react-native-svg";
@@ -81,6 +83,9 @@ export function SidebarDrawer({
   const [newRoleHsv, setNewRoleHsv] = useState<HsvColor>(hexToHsv(palette[0]));
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState(state.folders[0]?.id ?? "");
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const rolesByFolder = useMemo(() => {
     const grouped = new Map<string, ApparatusRole[]>();
@@ -114,6 +119,16 @@ export function SidebarDrawer({
       clearTimeout(timer);
     };
   }, [guideTargetId, visible]);
+
+  useEffect(() => {
+    if (visible) {
+      return;
+    }
+
+    setDeleteMode(false);
+    setSelectedRoleIds([]);
+    setDeleteConfirmOpen(false);
+  }, [visible]);
 
   function addFolder() {
     const name = newFolderName.trim();
@@ -170,6 +185,29 @@ export function SidebarDrawer({
     onClose();
   }
 
+  function startDeleteMode() {
+    setDeleteMode(true);
+    setSelectedRoleIds([]);
+    setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 80);
+  }
+
+  function cancelDeleteMode() {
+    setDeleteMode(false);
+    setSelectedRoleIds([]);
+    setDeleteConfirmOpen(false);
+  }
+
+  function toggleDeleteSelection(roleId: string) {
+    setSelectedRoleIds((current) =>
+      current.includes(roleId) ? current.filter((id) => id !== roleId) : [...current, roleId]
+    );
+  }
+
+  function deleteSelectedRoles() {
+    dispatch({ type: "deleteRoles", roleIds: selectedRoleIds });
+    cancelDeleteMode();
+  }
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -178,11 +216,20 @@ export function SidebarDrawer({
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>手具</Text>
-              <Text style={styles.subtitle}>選択中: {selectedRole?.name}</Text>
+              <Text style={styles.subtitle}>
+                {deleteMode ? `${selectedRoleIds.length}件を選択中` : `選択中: ${selectedRole?.name ?? "なし"}`}
+              </Text>
             </View>
-            <Pressable accessibilityLabel="閉じる" style={styles.iconButton} onPress={onClose}>
-              <X size={20} color={colors.text} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              {deleteMode ? (
+                <Pressable style={styles.deleteCancelButton} onPress={cancelDeleteMode}>
+                  <Text style={styles.deleteCancelText}>キャンセル</Text>
+                </Pressable>
+              ) : null}
+              <Pressable accessibilityLabel="閉じる" style={styles.iconButton} onPress={onClose}>
+                <X size={20} color={colors.text} />
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
@@ -235,31 +282,60 @@ export function SidebarDrawer({
                         )}
                       </View>
 
-                      {!folderItem.collapsed &&
+                      {(!folderItem.collapsed || deleteMode) &&
                         folderRoles.map((role) => {
                           const selected = role.id === state.selectedRoleId;
+                          const selectedForDelete = selectedRoleIds.includes(role.id);
                           return (
-                            <View key={role.id} style={[styles.roleRow, selected && styles.roleRowActive]}>
+                            <View
+                              key={role.id}
+                              style={[
+                                styles.roleRow,
+                                !deleteMode && selected && styles.roleRowActive,
+                                selectedForDelete && styles.roleRowDeleteSelected
+                              ]}
+                            >
                               <Pressable
                                 style={styles.roleMain}
-                                onPress={() => selectRole(role.id)}
+                                onPress={() =>
+                                  deleteMode ? toggleDeleteSelection(role.id) : selectRole(role.id)
+                                }
                               >
                                 <View style={[styles.swatch, { backgroundColor: role.color }]} />
                                 <Text style={styles.roleText} numberOfLines={2}>
                                   {role.name}
                                 </Text>
                               </Pressable>
-                              <Pressable
-                                accessibilityLabel={role.visible ? "非表示にする" : "表示する"}
-                                style={styles.eyeButton}
-                                onPress={() => dispatch({ type: "toggleRoleVisible", roleId: role.id })}
-                              >
-                                {role.visible ? (
-                                  <Eye size={18} color={colors.text} />
-                                ) : (
-                                  <EyeOff size={18} color={colors.textMuted} />
-                                )}
-                              </Pressable>
+                              {deleteMode ? (
+                                <Pressable
+                                  accessibilityRole="checkbox"
+                                  accessibilityState={{ checked: selectedForDelete }}
+                                  accessibilityLabel={`${role.name}を削除対象にする`}
+                                  style={styles.checkboxButton}
+                                  onPress={() => toggleDeleteSelection(role.id)}
+                                >
+                                  <View
+                                    style={[
+                                      styles.checkbox,
+                                      selectedForDelete && styles.checkboxSelected
+                                    ]}
+                                  >
+                                    {selectedForDelete ? <Check size={15} color="#ffffff" strokeWidth={3} /> : null}
+                                  </View>
+                                </Pressable>
+                              ) : (
+                                <Pressable
+                                  accessibilityLabel={role.visible ? "非表示にする" : "表示する"}
+                                  style={styles.eyeButton}
+                                  onPress={() => dispatch({ type: "toggleRoleVisible", roleId: role.id })}
+                                >
+                                  {role.visible ? (
+                                    <Eye size={18} color={colors.text} />
+                                  ) : (
+                                    <EyeOff size={18} color={colors.textMuted} />
+                                  )}
+                                </Pressable>
+                              )}
                             </View>
                           );
                         })}
@@ -355,8 +431,63 @@ export function SidebarDrawer({
                 <Text style={styles.primaryButtonText}>手具を追加</Text>
               </Pressable>
             </GuideTarget>
+
+            <View style={styles.deleteSection}>
+              <Pressable
+                disabled={deleteMode && selectedRoleIds.length === 0}
+                style={[
+                  styles.deleteModeButton,
+                  deleteMode && selectedRoleIds.length > 0 && styles.deleteSelectedButton,
+                  deleteMode && selectedRoleIds.length === 0 && styles.deleteModeButtonDisabled
+                ]}
+                onPress={() => {
+                  if (!deleteMode) {
+                    startDeleteMode();
+                    return;
+                  }
+
+                  setDeleteConfirmOpen(true);
+                }}
+              >
+                <Trash2
+                  size={17}
+                  color={deleteMode && selectedRoleIds.length > 0 ? "#ffffff" : colors.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.deleteModeButtonText,
+                    deleteMode && selectedRoleIds.length > 0 && styles.deleteSelectedButtonText
+                  ]}
+                >
+                  {deleteMode && selectedRoleIds.length > 0 ? "選択した手具を削除" : "削除"}
+                </Text>
+              </Pressable>
+              {deleteMode && selectedRoleIds.length === 0 ? (
+                <Text style={styles.deleteHelpText}>削除する手具にチェックを入れてください。</Text>
+              ) : null}
+            </View>
           </ScrollView>
         </View>
+        {deleteConfirmOpen ? (
+          <View style={styles.confirmOverlay}>
+            <Pressable style={styles.confirmBackdrop} onPress={() => setDeleteConfirmOpen(false)} />
+            <View style={styles.confirmPanel}>
+              <Text style={styles.confirmTitle}>本当に削除しますか？</Text>
+              <Text style={styles.confirmMessage}>
+                選択した手具と、すべてのシートにある配置を削除します。このデータは失われます。
+              </Text>
+              <View style={styles.confirmActions}>
+                <Pressable style={styles.confirmCancelButton} onPress={() => setDeleteConfirmOpen(false)}>
+                  <Text style={styles.confirmCancelText}>いいえ</Text>
+                </Pressable>
+                <Pressable style={styles.confirmDeleteButton} onPress={deleteSelectedRoles}>
+                  <Trash2 size={16} color="#ffffff" />
+                  <Text style={styles.confirmDeleteText}>削除</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
         {guideOverlay}
       </View>
     </Modal>
@@ -412,6 +543,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  deleteCancelButton: {
+    minHeight: 36,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  deleteCancelText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
   content: {
     padding: 16,
     gap: 16,
@@ -450,6 +597,26 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36
   },
+  checkboxButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  checkboxSelected: {
+    borderColor: colors.danger,
+    backgroundColor: colors.danger
+  },
   roleRow: {
     minHeight: 44,
     borderWidth: 1,
@@ -463,6 +630,10 @@ const styles = StyleSheet.create({
   roleRowActive: {
     borderColor: colors.text,
     backgroundColor: colors.primarySoft
+  },
+  roleRowDeleteSelected: {
+    borderColor: colors.danger,
+    backgroundColor: "#fef2f2"
   },
   roleMain: {
     flex: 1,
@@ -643,6 +814,105 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   primaryButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  deleteSection: {
+    gap: 7,
+    paddingTop: 2
+  },
+  deleteModeButton: {
+    minHeight: 42,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceSoft,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
+  deleteModeButtonDisabled: {
+    opacity: 0.65
+  },
+  deleteModeButtonText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  deleteSelectedButton: {
+    borderColor: colors.danger,
+    backgroundColor: colors.danger
+  },
+  deleteSelectedButtonText: {
+    color: "#ffffff"
+  },
+  deleteHelpText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: "center"
+  },
+  confirmOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20
+  },
+  confirmBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(15, 23, 42, 0.48)"
+  },
+  confirmPanel: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: 20,
+    gap: 12,
+    ...shadow
+  },
+  confirmTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800"
+  },
+  confirmMessage: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4
+  },
+  confirmCancelButton: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  confirmCancelText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  confirmDeleteButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.danger,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
+  confirmDeleteText: {
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "800"
