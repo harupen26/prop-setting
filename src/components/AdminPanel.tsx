@@ -64,6 +64,11 @@ type ParticipantManagerProps = {
   guideTargetId?: GuideTargetId;
 };
 
+type ProjectDataDialog =
+  | { type: "reset" }
+  | { type: "restore"; backup: LocalProjectBackup }
+  | { type: "message"; title: string; message: string };
+
 export function ProjectSettingsPanel({
   visible,
   state,
@@ -83,6 +88,8 @@ export function ProjectSettingsPanel({
   const [deleteCompetitionStep, setDeleteCompetitionStep] = useState<1 | 2>(1);
   const [localBackups, setLocalBackups] = useState<LocalProjectBackup[]>([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
+  const [backupActionBusy, setBackupActionBusy] = useState(false);
+  const [dataDialog, setDataDialog] = useState<ProjectDataDialog | undefined>();
   const duplicatePlaceholder = useMemo(() => {
     const baseName = activeCompetition?.name ?? "県大会";
     return `${baseName} 更新版`;
@@ -182,46 +189,80 @@ export function ProjectSettingsPanel({
   }
 
   function resetData() {
-    Alert.alert("初期データに戻しますか？", "端末内の編集内容が初期状態に戻ります。", [
-      { text: "キャンセル", style: "cancel" },
-      { text: "戻す", style: "destructive", onPress: () => dispatch({ type: "reset" }) }
-    ]);
+    setDataDialog({ type: "reset" });
   }
 
   function confirmRestoreBackup(backup: LocalProjectBackup) {
-    Alert.alert(
-      "この状態に戻しますか？",
-      `${formatBackupDate(backup.createdAt)}の状態に戻します。復元内容はDBに保存され、共有中のメンバーにも反映されます。`,
-      [
-        { text: "キャンセル", style: "cancel" },
-        { text: "復元する", onPress: () => void restoreBackup(backup) }
-      ]
-    );
+    setDataDialog({ type: "restore", backup });
+  }
+
+  function performReset() {
+    dispatch({ type: "reset" });
+    setDataDialog({
+      type: "message",
+      title: "初期状態に戻しました",
+      message: "画面の「DB同期: 最新」を確認してからアプリを閉じてください。"
+    });
   }
 
   async function restoreBackup(backup: LocalProjectBackup) {
-    const currentPayload = buildProjectSyncPayload(state);
-    if (currentPayload) {
-      await saveLocalProjectBackup(currentPayload, "before-restore").catch(() => undefined);
-    }
+    setBackupActionBusy(true);
+    setDataDialog(undefined);
+    try {
+      const currentPayload = buildProjectSyncPayload(state);
+      if (currentPayload) {
+        await saveLocalProjectBackup(currentPayload, "before-restore").catch(() => undefined);
+      }
 
-    dispatch({ type: "hydrate", state: mergeProjectSyncPayload(state, backup.payload) });
-    const backups = await getLocalProjectBackups(backup.shareId).catch(() => localBackups);
-    setLocalBackups(backups);
-    Alert.alert("復元しました", "画面の「DB同期: 最新」を確認してからアプリを閉じてください。");
+      dispatch({ type: "hydrate", state: mergeProjectSyncPayload(state, backup.payload) });
+      const backups = await getLocalProjectBackups(backup.shareId).catch(() => localBackups);
+      setLocalBackups(backups);
+      setDataDialog({
+        type: "message",
+        title: "復元しました",
+        message: "画面の「DB同期: 最新」を確認してからアプリを閉じてください。"
+      });
+    } catch {
+      setDataDialog({
+        type: "message",
+        title: "復元できませんでした",
+        message: "端末の空き容量を確認して、もう一度お試しください。"
+      });
+    } finally {
+      setBackupActionBusy(false);
+    }
   }
 
   async function saveCurrentBackup() {
     const payload = buildProjectSyncPayload(state);
     if (!payload) {
-      Alert.alert("保存できませんでした", "プロジェクトを開いてから、もう一度お試しください。");
+      setDataDialog({
+        type: "message",
+        title: "保存できませんでした",
+        message: "プロジェクトを開いてから、もう一度お試しください。"
+      });
       return;
     }
 
-    await saveLocalProjectBackup(payload, "manual");
-    const backups = await getLocalProjectBackups(payload.project.shareId);
-    setLocalBackups(backups);
-    Alert.alert("端末に保存しました", "このプロジェクトの直近3件まで保持します。");
+    setBackupActionBusy(true);
+    try {
+      await saveLocalProjectBackup(payload, "manual");
+      const backups = await getLocalProjectBackups(payload.project.shareId);
+      setLocalBackups(backups);
+      setDataDialog({
+        type: "message",
+        title: "端末に保存しました",
+        message: "このプロジェクトの直近3件まで保持します。"
+      });
+    } catch {
+      setDataDialog({
+        type: "message",
+        title: "保存できませんでした",
+        message: "端末の空き容量を確認して、もう一度お試しください。"
+      });
+    } finally {
+      setBackupActionBusy(false);
+    }
   }
 
   return (
@@ -340,7 +381,11 @@ export function ProjectSettingsPanel({
             <Text style={styles.helpText}>
               DBから更新を受け取る前の状態を、この端末に自動保存します。1プロジェクト最大3件、30日で自動的に入れ替わります。
             </Text>
-            <Pressable style={styles.backupSaveButton} onPress={() => void saveCurrentBackup()}>
+            <Pressable
+              disabled={backupActionBusy}
+              style={[styles.backupSaveButton, backupActionBusy && styles.buttonDisabled]}
+              onPress={() => void saveCurrentBackup()}
+            >
               <Save size={16} color={colors.text} />
               <Text style={styles.backupSaveText}>今の状態を端末に保存</Text>
             </Pressable>
@@ -357,7 +402,11 @@ export function ProjectSettingsPanel({
                       {backup.payload.competitions.length}シート / 配置{backup.payload.markers.length}件
                     </Text>
                   </View>
-                  <Pressable style={styles.backupRestoreButton} onPress={() => confirmRestoreBackup(backup)}>
+                  <Pressable
+                    disabled={backupActionBusy}
+                    style={[styles.backupRestoreButton, backupActionBusy && styles.buttonDisabled]}
+                    onPress={() => confirmRestoreBackup(backup)}
+                  >
                     <RotateCcw size={15} color={colors.text} />
                     <Text style={styles.backupRestoreText}>復元</Text>
                   </Pressable>
@@ -391,6 +440,57 @@ export function ProjectSettingsPanel({
                     <Trash2 size={16} color="#ffffff" />
                     <Text style={styles.confirmDangerText}>完全に削除</Text>
                   </Pressable>
+                )}
+              </View>
+            </View>
+          </View>
+        ) : null}
+        {dataDialog ? (
+          <View style={styles.confirmOverlay}>
+            <Pressable
+              style={styles.confirmBackdrop}
+              onPress={() => (backupActionBusy ? undefined : setDataDialog(undefined))}
+            />
+            <View style={styles.confirmPanel}>
+              <Text style={styles.confirmTitle}>
+                {dataDialog.type === "reset"
+                  ? "初期データに戻しますか？"
+                  : dataDialog.type === "restore"
+                    ? "この状態に戻しますか？"
+                    : dataDialog.title}
+              </Text>
+              <Text style={styles.confirmMessage}>
+                {dataDialog.type === "reset"
+                  ? "現在の共同データが初期状態に置き換わり、共有中のメンバーにも反映されます。"
+                  : dataDialog.type === "restore"
+                    ? `${formatBackupDate(dataDialog.backup.createdAt)}の状態に戻します。復元内容は共有中のメンバーにも反映されます。`
+                    : dataDialog.message}
+              </Text>
+              <View style={styles.confirmActions}>
+                {dataDialog.type === "message" ? (
+                  <Pressable style={styles.confirmPrimaryButton} onPress={() => setDataDialog(undefined)}>
+                    <Text style={styles.confirmPrimaryText}>OK</Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    <Pressable style={styles.confirmCancelButton} onPress={() => setDataDialog(undefined)}>
+                      <Text style={styles.confirmCancelText}>キャンセル</Text>
+                    </Pressable>
+                    {dataDialog.type === "reset" ? (
+                      <Pressable style={styles.confirmDangerButton} onPress={performReset}>
+                        <RotateCcw size={16} color="#ffffff" />
+                        <Text style={styles.confirmDangerText}>初期状態に戻す</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={styles.confirmPrimaryButton}
+                        onPress={() => void restoreBackup(dataDialog.backup)}
+                      >
+                        <RotateCcw size={16} color="#ffffff" />
+                        <Text style={styles.confirmPrimaryText}>復元する</Text>
+                      </Pressable>
+                    )}
+                  </>
                 )}
               </View>
             </View>
@@ -1013,6 +1113,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900"
   },
+  buttonDisabled: {
+    opacity: 0.5
+  },
   linkText: {
     color: colors.text,
     fontSize: 13,
@@ -1194,6 +1297,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.danger
   },
   confirmDangerText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  confirmPrimaryButton: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.primary
+  },
+  confirmPrimaryText: {
     color: "#ffffff",
     fontSize: 13,
     fontWeight: "900"
