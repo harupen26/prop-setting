@@ -4,6 +4,7 @@ import { type Dispatch, useEffect, useRef, useState } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import type { AppState } from "../types";
 import type { AppAction } from "./appReducer";
+import { saveLocalProjectBackup } from "./localProjectBackups";
 import {
   buildProjectSyncPayload,
   getActiveProjectShareId,
@@ -111,7 +112,12 @@ export function useProjectRealtimeSync(
     lastSeenUpdatedAtRef.current = undefined;
     setSyncInfo(getSyncInfo("connecting"));
 
-    function applyRemoteRow(row: ProjectSnapshotRow, applyOptions: { includeOwnUpdate?: boolean } = {}) {
+    let remoteApplyQueue = Promise.resolve();
+
+    async function applyRemoteRow(
+      row: ProjectSnapshotRow,
+      applyOptions: { includeOwnUpdate?: boolean } = {}
+    ) {
       if (
         cancelled ||
         (!applyOptions.includeOwnUpdate && row.updated_by === syncClientId) ||
@@ -125,11 +131,38 @@ export function useProjectRealtimeSync(
       }
 
       lastSeenUpdatedAtRef.current = row.updated_at;
+      const currentPayload = buildProjectSyncPayload(stateRef.current);
+      if (
+        currentPayload &&
+        getProjectSyncFingerprint(currentPayload) !== getProjectSyncFingerprint(row.payload)
+      ) {
+        await saveLocalProjectBackup(currentPayload, "before-remote-sync").catch(() => undefined);
+      }
+
+      if (cancelled) {
+        return;
+      }
+
       applyingRemoteRef.current = true;
       lastFingerprintRef.current = getProjectSyncFingerprint(row.payload);
       setSyncInfo(getSyncInfo("receiving"));
       dispatch({ type: "hydrate", state: mergeProjectSyncPayload(stateRef.current, row.payload) });
       scheduleSyncedStatus();
+    }
+
+    function enqueueRemoteRow(
+      row: ProjectSnapshotRow,
+      applyOptions: { includeOwnUpdate?: boolean } = {}
+    ) {
+      remoteApplyQueue = remoteApplyQueue
+        .then(() => applyRemoteRow(row, applyOptions))
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            setSyncInfo(getSyncInfo("error", error instanceof Error ? error.message : "DB同期に失敗しました"));
+          }
+        });
+
+      return remoteApplyQueue;
     }
 
     const channel = syncClient
@@ -145,7 +178,7 @@ export function useProjectRealtimeSync(
         (event) => {
           const row = event.new as ProjectSnapshotRow | undefined;
           if (row) {
-            applyRemoteRow(row);
+            void enqueueRemoteRow(row);
           }
         }
       )
@@ -170,7 +203,7 @@ export function useProjectRealtimeSync(
       readyShareIdRef.current = shareId;
 
       if (data?.payload && isProjectSyncPayload(data.payload)) {
-        applyRemoteRow(data as ProjectSnapshotRow, { includeOwnUpdate: true });
+        await enqueueRemoteRow(data as ProjectSnapshotRow, { includeOwnUpdate: true });
         setSyncInfo(getSyncInfo("synced"));
         return;
       }

@@ -16,15 +16,23 @@ import {
   Copy,
   FileDown,
   GitMerge,
+  History,
   Link,
   Plus,
   RotateCcw,
+  Save,
   SquareStack,
   Trash2,
   Users
 } from "lucide-react-native";
 
 import type { AppAction } from "../state/appReducer";
+import {
+  getLocalProjectBackups,
+  saveLocalProjectBackup,
+  type LocalProjectBackup
+} from "../state/localProjectBackups";
+import { buildProjectSyncPayload, mergeProjectSyncPayload } from "../state/projectSync";
 import type { AppState, Competition, Participant } from "../types";
 import { colors, radius } from "../theme";
 import {
@@ -73,6 +81,8 @@ export function ProjectSettingsPanel({
   const [duplicateName, setDuplicateName] = useState("");
   const [deleteCompetitionCandidate, setDeleteCompetitionCandidate] = useState<Competition | undefined>();
   const [deleteCompetitionStep, setDeleteCompetitionStep] = useState<1 | 2>(1);
+  const [localBackups, setLocalBackups] = useState<LocalProjectBackup[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
   const duplicatePlaceholder = useMemo(() => {
     const baseName = activeCompetition?.name ?? "県大会";
     return `${baseName} 更新版`;
@@ -98,6 +108,36 @@ export function ProjectSettingsPanel({
       clearTimeout(timer);
     };
   }, [guideTargetId, visible]);
+
+  useEffect(() => {
+    const shareId = activeProject?.shareId;
+    if (!visible || !shareId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setBackupsLoading(true);
+    getLocalProjectBackups(shareId)
+      .then((backups) => {
+        if (!cancelled) {
+          setLocalBackups(backups);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocalBackups([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBackupsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProject?.shareId, visible]);
 
   function duplicateCompetition() {
     if (!activeCompetition) {
@@ -146,6 +186,42 @@ export function ProjectSettingsPanel({
       { text: "キャンセル", style: "cancel" },
       { text: "戻す", style: "destructive", onPress: () => dispatch({ type: "reset" }) }
     ]);
+  }
+
+  function confirmRestoreBackup(backup: LocalProjectBackup) {
+    Alert.alert(
+      "この状態に戻しますか？",
+      `${formatBackupDate(backup.createdAt)}の状態に戻します。復元内容はDBに保存され、共有中のメンバーにも反映されます。`,
+      [
+        { text: "キャンセル", style: "cancel" },
+        { text: "復元する", onPress: () => void restoreBackup(backup) }
+      ]
+    );
+  }
+
+  async function restoreBackup(backup: LocalProjectBackup) {
+    const currentPayload = buildProjectSyncPayload(state);
+    if (currentPayload) {
+      await saveLocalProjectBackup(currentPayload, "before-restore").catch(() => undefined);
+    }
+
+    dispatch({ type: "hydrate", state: mergeProjectSyncPayload(state, backup.payload) });
+    const backups = await getLocalProjectBackups(backup.shareId).catch(() => localBackups);
+    setLocalBackups(backups);
+    Alert.alert("復元しました", "画面の「DB同期: 最新」を確認してからアプリを閉じてください。");
+  }
+
+  async function saveCurrentBackup() {
+    const payload = buildProjectSyncPayload(state);
+    if (!payload) {
+      Alert.alert("保存できませんでした", "プロジェクトを開いてから、もう一度お試しください。");
+      return;
+    }
+
+    await saveLocalProjectBackup(payload, "manual");
+    const backups = await getLocalProjectBackups(payload.project.shareId);
+    setLocalBackups(backups);
+    Alert.alert("端末に保存しました", "このプロジェクトの直近3件まで保持します。");
   }
 
   return (
@@ -255,6 +331,40 @@ export function ProjectSettingsPanel({
               <Text style={styles.resetText}>初期データに戻す</Text>
             </Pressable>
           </View>
+
+          <View style={styles.section}>
+            <View style={styles.backupTitleLine}>
+              <History size={17} color={colors.text} />
+              <Text style={styles.sectionTitle}>端末バックアップ</Text>
+            </View>
+            <Text style={styles.helpText}>
+              DBから更新を受け取る前の状態を、この端末に自動保存します。1プロジェクト最大3件、30日で自動的に入れ替わります。
+            </Text>
+            <Pressable style={styles.backupSaveButton} onPress={() => void saveCurrentBackup()}>
+              <Save size={16} color={colors.text} />
+              <Text style={styles.backupSaveText}>今の状態を端末に保存</Text>
+            </Pressable>
+            {backupsLoading ? <Text style={styles.backupEmptyText}>確認中...</Text> : null}
+            {!backupsLoading && localBackups.length === 0 ? (
+              <Text style={styles.backupEmptyText}>復元できるバックアップはまだありません。</Text>
+            ) : null}
+            <View style={styles.backupList}>
+              {localBackups.map((backup) => (
+                <View key={backup.id} style={styles.backupRow}>
+                  <View style={styles.backupDetails}>
+                    <Text style={styles.backupDate}>{formatBackupDate(backup.createdAt)}</Text>
+                    <Text style={styles.backupMeta}>
+                      {backup.payload.competitions.length}シート / 配置{backup.payload.markers.length}件
+                    </Text>
+                  </View>
+                  <Pressable style={styles.backupRestoreButton} onPress={() => confirmRestoreBackup(backup)}>
+                    <RotateCcw size={15} color={colors.text} />
+                    <Text style={styles.backupRestoreText}>復元</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </View>
         </ScrollView>
         {deleteCompetitionCandidate ? (
           <View style={styles.confirmOverlay}>
@@ -290,6 +400,21 @@ export function ProjectSettingsPanel({
       </SafeAreaView>
     </Modal>
   );
+}
+
+function formatBackupDate(createdAt: string): string {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) {
+    return createdAt;
+  }
+
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 export function ParticipantManagerPanel({
@@ -815,6 +940,78 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     lineHeight: 16
+  },
+  backupTitleLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7
+  },
+  backupList: {
+    gap: 8
+  },
+  backupSaveButton: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: colors.surface
+  },
+  backupSaveText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  backupRow: {
+    minHeight: 58,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    backgroundColor: colors.surface
+  },
+  backupDetails: {
+    flex: 1,
+    gap: 3
+  },
+  backupDate: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  backupMeta: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  backupEmptyText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  backupRestoreButton: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.surfaceSoft
+  },
+  backupRestoreText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "900"
   },
   linkText: {
     color: colors.text,
