@@ -13,6 +13,8 @@ pnpm start
 
 初めて使うメンバー・管理者向けの説明は[docs/user-guide.md](docs/user-guide.md)にあります。
 
+共同運用者への引き継ぎ、Supabase休止時の復旧、Codexへの相談手順は[docs/operator-guide.md](docs/operator-guide.md)にあります。
+
 ## PWAとして公開
 
 本番用のWeb/PWAを書き出します。
