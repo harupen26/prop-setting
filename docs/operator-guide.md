@@ -112,4 +112,3 @@ pnpm exec expo export --platform web
 ```
 
 その後、GitHubへ反映し、Vercelのデプロイ成功と本番画面を確認します。本番のデータを使う削除テストは行わず、削除処理はローカル環境で確認します。
-
