@@ -65,7 +65,6 @@ type ParticipantManagerProps = {
 };
 
 type ProjectDataDialog =
-  | { type: "reset" }
   | { type: "restore"; backup: LocalProjectBackup }
   | { type: "message"; title: string; message: string };
 
@@ -188,21 +187,8 @@ export function ProjectSettingsPanel({
     closeDeleteCompetition();
   }
 
-  function resetData() {
-    setDataDialog({ type: "reset" });
-  }
-
   function confirmRestoreBackup(backup: LocalProjectBackup) {
     setDataDialog({ type: "restore", backup });
-  }
-
-  function performReset() {
-    dispatch({ type: "reset" });
-    setDataDialog({
-      type: "message",
-      title: "初期状態に戻しました",
-      message: "画面の「DB同期: 最新」を確認してからアプリを閉じてください。"
-    });
   }
 
   async function restoreBackup(backup: LocalProjectBackup) {
@@ -367,10 +353,6 @@ export function ProjectSettingsPanel({
                 <Text style={styles.primaryButtonText}>PDF出力</Text>
               </Pressable>
             </GuideTarget>
-            <Pressable style={styles.resetButton} onPress={resetData}>
-              <RotateCcw size={16} color={colors.danger} />
-              <Text style={styles.resetText}>初期データに戻す</Text>
-            </Pressable>
           </View>
 
           <View style={styles.section}>
@@ -453,18 +435,12 @@ export function ProjectSettingsPanel({
             />
             <View style={styles.confirmPanel}>
               <Text style={styles.confirmTitle}>
-                {dataDialog.type === "reset"
-                  ? "初期データに戻しますか？"
-                  : dataDialog.type === "restore"
-                    ? "この状態に戻しますか？"
-                    : dataDialog.title}
+                {dataDialog.type === "restore" ? "この状態に戻しますか？" : dataDialog.title}
               </Text>
               <Text style={styles.confirmMessage}>
-                {dataDialog.type === "reset"
-                  ? "現在の共同データが初期状態に置き換わり、共有中のメンバーにも反映されます。"
-                  : dataDialog.type === "restore"
-                    ? `${formatBackupDate(dataDialog.backup.createdAt)}の状態に戻します。復元内容は共有中のメンバーにも反映されます。`
-                    : dataDialog.message}
+                {dataDialog.type === "restore"
+                  ? `${formatBackupDate(dataDialog.backup.createdAt)}の状態に戻します。復元内容は共有中のメンバーにも反映されます。`
+                  : dataDialog.message}
               </Text>
               <View style={styles.confirmActions}>
                 {dataDialog.type === "message" ? (
@@ -476,20 +452,13 @@ export function ProjectSettingsPanel({
                     <Pressable style={styles.confirmCancelButton} onPress={() => setDataDialog(undefined)}>
                       <Text style={styles.confirmCancelText}>キャンセル</Text>
                     </Pressable>
-                    {dataDialog.type === "reset" ? (
-                      <Pressable style={styles.confirmDangerButton} onPress={performReset}>
-                        <RotateCcw size={16} color="#ffffff" />
-                        <Text style={styles.confirmDangerText}>初期状態に戻す</Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        style={styles.confirmPrimaryButton}
-                        onPress={() => void restoreBackup(dataDialog.backup)}
-                      >
-                        <RotateCcw size={16} color="#ffffff" />
-                        <Text style={styles.confirmPrimaryText}>復元する</Text>
-                      </Pressable>
-                    )}
+                    <Pressable
+                      style={styles.confirmPrimaryButton}
+                      onPress={() => void restoreBackup(dataDialog.backup)}
+                    >
+                      <RotateCcw size={16} color="#ffffff" />
+                      <Text style={styles.confirmPrimaryText}>復元する</Text>
+                    </Pressable>
                   </>
                 )}
               </View>
@@ -1022,18 +991,6 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: "#ffffff",
     fontSize: 14,
-    fontWeight: "800"
-  },
-  resetButton: {
-    minHeight: 36,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6
-  },
-  resetText: {
-    color: colors.danger,
-    fontSize: 12,
     fontWeight: "800"
   },
   helpText: {
