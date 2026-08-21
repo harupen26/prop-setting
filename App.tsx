@@ -27,6 +27,8 @@ import {
   Eye,
   FileDown,
   HelpCircle,
+  Lock,
+  LockOpen,
   LogIn,
   Plus,
   Settings,
@@ -69,6 +71,7 @@ type GuideUiSnapshot = {
   canvasInteractionLocked: boolean;
   drawerOpen: boolean;
   fineAdjustMode: boolean;
+  markerPositionLocked: boolean;
   participantManagerOpen: boolean;
   pdfOptionsOpen: boolean;
   projectListOpen: boolean;
@@ -108,6 +111,7 @@ function AppShell() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | undefined>();
   const [canvasInteractionLocked, setCanvasInteractionLocked] = useState(false);
   const [fineAdjustMode, setFineAdjustMode] = useState(false);
+  const [markerPositionLocked, setMarkerPositionLocked] = useState(false);
   const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
   const [pdfOptions, setPdfOptions] = useState<PdfExportOptions>({
     ...defaultPdfExportOptions,
@@ -182,7 +186,7 @@ function AppShell() {
   }, [activeGuideMode, currentGuideStep?.targetId, projectListOpen, selectedMarkerId]);
 
   function placeMarker(xSnap: number, ySnap: number) {
-    if (!selectedRole) {
+    if (!selectedRole || markerPositionLocked) {
       return;
     }
 
@@ -312,6 +316,7 @@ function AppShell() {
       canvasInteractionLocked,
       drawerOpen,
       fineAdjustMode,
+      markerPositionLocked,
       participantManagerOpen,
       pdfOptionsOpen,
       projectListOpen,
@@ -324,6 +329,7 @@ function AppShell() {
     setIntroOpen(false);
     setActiveGuideMode(mode);
     setGuideIndex(0);
+    setMarkerPositionLocked(false);
     void markIntroSeen(mode);
     prepareGuideStep(nextSteps[0]);
   }
@@ -342,6 +348,7 @@ function AppShell() {
       setCanvasInteractionLocked(uiSnapshot.canvasInteractionLocked);
       setDrawerOpen(uiSnapshot.drawerOpen);
       setFineAdjustMode(uiSnapshot.fineAdjustMode);
+      setMarkerPositionLocked(uiSnapshot.markerPositionLocked);
       setParticipantManagerOpen(uiSnapshot.participantManagerOpen);
       setPdfOptionsOpen(uiSnapshot.pdfOptionsOpen);
       setProjectListOpen(uiSnapshot.projectListOpen);
@@ -424,7 +431,7 @@ function AppShell() {
   const nudgeStep = fineAdjustMode ? 1 : SNAP.fineStep;
 
   function nudgeSelectedMarker(dxSnap: number, dySnap: number) {
-    if (!selectedMarker) {
+    if (!selectedMarker || markerPositionLocked) {
       return;
     }
 
@@ -650,6 +657,44 @@ function AppShell() {
           </View>
         </GuideTarget>
 
+        <View style={[styles.positionLockBar, markerPositionLocked && styles.positionLockBarActive]}>
+          <View style={styles.positionLockTextWrap}>
+            <Text style={styles.positionLockTitle}>手具の位置</Text>
+            <Text style={styles.positionLockHelp}>
+              {markerPositionLocked ? "固定中。拡大縮小とシート移動はできます。" : "配置と移動ができます。"}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityLabel={markerPositionLocked ? "手具の位置固定を解除" : "手具の位置を固定"}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: markerPositionLocked }}
+            style={[styles.positionLockButton, markerPositionLocked && styles.positionLockButtonActive]}
+            onPress={() => {
+              setMarkerPositionLocked((locked) => {
+                const next = !locked;
+                if (next) {
+                  setSelectedMarkerId(undefined);
+                }
+                return next;
+              });
+            }}
+          >
+            {markerPositionLocked ? (
+              <Lock size={16} color="#ffffff" />
+            ) : (
+              <LockOpen size={16} color={colors.text} />
+            )}
+            <Text
+              style={[
+                styles.positionLockButtonText,
+                markerPositionLocked && styles.positionLockButtonTextActive
+              ]}
+            >
+              {markerPositionLocked ? "固定中" : "固定する"}
+            </Text>
+          </Pressable>
+        </View>
+
         <GuideTarget targetId="drill-canvas">
           <DrillCanvas
             phase={state.activePhase}
@@ -657,11 +702,14 @@ function AppShell() {
             folders={state.folders}
             roles={state.roles}
             participants={state.participants}
+            markerPositionLocked={markerPositionLocked}
             selectedMarkerId={selectedMarkerId}
             onPlace={placeMarker}
-            onMove={(markerId, xSnap, ySnap) =>
-              dispatch({ type: "moveMarker", markerId, xSnap, ySnap })
-            }
+            onMove={(markerId, xSnap, ySnap) => {
+              if (!markerPositionLocked) {
+                dispatch({ type: "moveMarker", markerId, xSnap, ySnap });
+              }
+            }}
             onSelect={setSelectedMarkerId}
             onInteractionLockChange={setCanvasInteractionLocked}
             onGuidePlace={() => completeGuideStep("member-drill")}
@@ -673,11 +721,13 @@ function AppShell() {
 
         <View style={styles.canvasHelp}>
           <Text style={styles.canvasHelpText}>
-            タップで配置、丸をドラッグで移動。選択中は矢印で位置調整できます。
+            {markerPositionLocked
+              ? "手具は固定されています。ピンチ操作やシート移動で確認できます。"
+              : "タップで配置、丸をドラッグで移動。選択中は矢印で位置調整できます。"}
           </Text>
         </View>
 
-        {selectedMarker ? (
+        {selectedMarker && !markerPositionLocked ? (
           <View style={styles.markerInspector}>
             <View style={styles.markerInspectorTop}>
               <View>
@@ -1738,6 +1788,64 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: "800"
+  },
+  positionLockBar: {
+    minHeight: 56,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    backgroundColor: colors.surface
+  },
+  positionLockBarActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft
+  },
+  positionLockTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2
+  },
+  positionLockTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  positionLockHelp: {
+    color: colors.textMuted,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "700"
+  },
+  positionLockButton: {
+    minWidth: 96,
+    minHeight: 38,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.surface
+  },
+  positionLockButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  positionLockButtonText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  positionLockButtonTextActive: {
+    color: "#ffffff"
   },
   canvasHelp: {
     marginTop: -8

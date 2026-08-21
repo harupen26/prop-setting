@@ -46,6 +46,7 @@ type Props = {
   folders: RoleFolder[];
   roles: ApparatusRole[];
   participants: Participant[];
+  markerPositionLocked: boolean;
   selectedMarkerId?: string;
   onPlace: (xSnap: number, ySnap: number) => void;
   onMove: (markerId: string, xSnap: number, ySnap: number) => void;
@@ -67,6 +68,7 @@ export function DrillCanvas({
   folders,
   roles,
   participants,
+  markerPositionLocked,
   selectedMarkerId,
   onPlace,
   onMove,
@@ -110,6 +112,7 @@ export function DrillCanvas({
   const sizeRef = useRef(size);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
+  const markerPositionLockedRef = useRef(markerPositionLocked);
   const markerRadiusRef = useRef(markerRadius);
   const dimensionsRef = useRef({
     displayHeight,
@@ -159,6 +162,14 @@ export function DrillCanvas({
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+
+  useEffect(() => {
+    markerPositionLockedRef.current = markerPositionLocked;
+    if (markerPositionLocked) {
+      dragRef.current.markerId = undefined;
+      setDragPreview(undefined);
+    }
+  }, [markerPositionLocked]);
 
   useEffect(() => {
     markerRadiusRef.current = markerRadius;
@@ -225,12 +236,14 @@ export function DrillCanvas({
 
         const { locationX, locationY } = event.nativeEvent;
         const point = viewportToCanvasPoint(locationX, locationY, panRef.current, zoomRef.current);
-        const hit = findNearestMarker(
-          point.x,
-          point.y,
-          markerViewsRef.current,
-          getHitRadius(markerRadiusRef.current) / zoomRef.current
-        );
+        const hit = markerPositionLockedRef.current
+          ? undefined
+          : findNearestMarker(
+              point.x,
+              point.y,
+              markerViewsRef.current,
+              getHitRadius(markerRadiusRef.current) / zoomRef.current
+            );
         dragRef.current = {
           markerId: hit?.marker.id,
           startX: locationX,
@@ -262,6 +275,11 @@ export function DrillCanvas({
         const drag = dragRef.current;
         const { locationX, locationY } = event.nativeEvent;
         const distance = Math.hypot(locationX - drag.startX, locationY - drag.startY);
+
+        if (markerPositionLockedRef.current && drag.markerId) {
+          drag.markerId = undefined;
+          setDragPreview(undefined);
+        }
 
         if (!drag.markerId) {
           if (zoomRef.current <= 1) {
@@ -308,7 +326,7 @@ export function DrillCanvas({
         const { locationX, locationY } = event.nativeEvent;
         const distance = Math.hypot(locationX - drag.startX, locationY - drag.startY);
 
-        if (!drag.markerId && distance < 6) {
+        if (!markerPositionLockedRef.current && !drag.markerId && distance < 6) {
           const canvasPoint = viewportToCanvasPoint(locationX, locationY, panRef.current, zoomRef.current);
           const point = coordinateToSnapWithStep(canvasPoint.x, canvasPoint.y, sizeRef.current);
           callbacksRef.current.onPlace(point.xSnap, point.ySnap);
