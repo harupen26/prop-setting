@@ -62,7 +62,7 @@ export function buildProjectSyncPayload(
 }
 
 export function getProjectSyncFingerprint(payload: ProjectSyncPayload): string {
-  return JSON.stringify({
+  return stableSerialize({
     ...payload,
     updatedAt: ""
   });
@@ -327,9 +327,30 @@ function getMarkerSlotKey(marker: Marker): string {
 }
 
 function valuesEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return stableSerialize(left) === stableSerialize(right);
 }
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function stableSerialize(value: unknown): string {
+  return JSON.stringify(sortObjectKeys(value));
+}
+
+function sortObjectKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortObjectKeys);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, sortObjectKeys(item)])
+  );
 }

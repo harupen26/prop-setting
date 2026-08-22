@@ -8,6 +8,7 @@ import { getVisibleMarkers } from "../selectors";
 import { appReducer } from "../state/appReducer";
 import {
   buildProjectSyncPayload,
+  getProjectSyncFingerprint,
   mergeConcurrentProjectSyncPayload,
   mergeProjectSyncPayload
 } from "../state/projectSync";
@@ -340,6 +341,17 @@ describe("統合", () => {
 });
 
 describe("DB同期", () => {
+  it("同じDBデータを統合しても新しい差分を作らない", () => {
+    const payload = buildProjectSyncPayload(initialAppState)!;
+    const reorderedPayload = reverseObjectKeys(payload) as typeof payload;
+    const merged = mergeConcurrentProjectSyncPayload(payload, payload, reorderedPayload);
+    const hydrated = mergeProjectSyncPayload(initialAppState, merged);
+    const rebuilt = buildProjectSyncPayload(hydrated)!;
+
+    expect(getProjectSyncFingerprint(merged)).toBe(getProjectSyncFingerprint(payload));
+    expect(getProjectSyncFingerprint(rebuilt)).toBe(getProjectSyncFingerprint(merged));
+  });
+
   it("同じ招待IDの仮プロジェクトをDB側のプロジェクトに置き換える", () => {
     const local = appReducer(initialAppState, {
       type: "joinProject",
@@ -600,4 +612,20 @@ function competition(
     createdAt: "2026-07-03T00:00:00.000Z",
     ...overrides
   };
+}
+
+function reverseObjectKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(reverseObjectKeys);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .reverse()
+      .map(([key, item]) => [key, reverseObjectKeys(item)])
+  );
 }
