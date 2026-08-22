@@ -68,6 +68,81 @@ export function getProjectSyncFingerprint(payload: ProjectSyncPayload): string {
   });
 }
 
+export function mergeConcurrentProjectSyncPayload(
+  base: ProjectSyncPayload,
+  local: ProjectSyncPayload,
+  remote: ProjectSyncPayload,
+  updatedAt = new Date().toISOString()
+): ProjectSyncPayload {
+  const project = mergeRecordFields(base.project, local.project, remote.project);
+  const competitions = mergeEntityCollections(
+    base.competitions,
+    local.competitions,
+    remote.competitions,
+    (competition) => competition.id,
+    mergeRecordFields
+  );
+  const participants = mergeEntityCollections(
+    base.participants,
+    local.participants,
+    remote.participants,
+    (participant) => participant.id,
+    mergeRecordFields
+  );
+  const folders = mergeEntityCollections(
+    base.folders,
+    local.folders,
+    remote.folders,
+    (folder) => folder.id,
+    mergeRecordFields
+  );
+  const roles = mergeEntityCollections(
+    base.roles,
+    local.roles,
+    remote.roles,
+    (role) => role.id,
+    mergeRecordFields
+  );
+  const markers = mergeEntityCollections(
+    base.markers,
+    local.markers,
+    remote.markers,
+    getMarkerSlotKey
+  );
+  const integratedParticipantIdsByCompetition = mergeRecordValues(
+    base.integratedParticipantIdsByCompetition,
+    local.integratedParticipantIdsByCompetition,
+    remote.integratedParticipantIdsByCompetition
+  );
+  const competitionIds = new Set(competitions.map((competition) => competition.id));
+  const participantIds = new Set(participants.map((participant) => participant.id));
+  const roleIds = new Set(roles.map((role) => role.id));
+
+  return {
+    version: PROJECT_SYNC_VERSION,
+    project,
+    competitions,
+    participants,
+    folders,
+    roles,
+    markers: markers.filter(
+      (marker) =>
+        competitionIds.has(marker.competitionId) &&
+        participantIds.has(marker.participantId) &&
+        roleIds.has(marker.roleId)
+    ),
+    integratedParticipantIdsByCompetition: Object.fromEntries(
+      Object.entries(integratedParticipantIdsByCompetition)
+        .filter(([competitionId]) => competitionIds.has(competitionId))
+        .map(([competitionId, integratedParticipantIds]) => [
+          competitionId,
+          integratedParticipantIds.filter((participantId) => participantIds.has(participantId))
+        ])
+    ),
+    updatedAt
+  };
+}
+
 export function mergeProjectSyncPayload(current: AppState, payload: ProjectSyncPayload): AppState {
   const incomingProject = {
     ...payload.project,
@@ -180,4 +255,81 @@ export function isProjectSyncPayload(value: unknown): value is ProjectSyncPayloa
 
 function normalizeShareId(shareId: string): string {
   return shareId.trim().toUpperCase();
+}
+
+function mergeEntityCollections<T>(
+  baseItems: T[],
+  localItems: T[],
+  remoteItems: T[],
+  getKey: (item: T) => string,
+  mergeChangedItem?: (base: T, local: T, remote: T) => T
+): T[] {
+  const baseByKey = new Map(baseItems.map((item) => [getKey(item), item]));
+  const localByKey = new Map(localItems.map((item) => [getKey(item), item]));
+  const remoteByKey = new Map(remoteItems.map((item) => [getKey(item), item]));
+  const orderedKeys = unique([
+    ...remoteItems.map(getKey),
+    ...localItems.map(getKey),
+    ...baseItems.map(getKey)
+  ]);
+
+  return orderedKeys.flatMap((key) => {
+    const baseItem = baseByKey.get(key);
+    const localItem = localByKey.get(key);
+    const remoteItem = remoteByKey.get(key);
+    const localChanged = !valuesEqual(localItem, baseItem);
+
+    if (!localChanged) {
+      return remoteItem ? [remoteItem] : [];
+    }
+
+    if (baseItem && localItem && remoteItem && mergeChangedItem) {
+      return [mergeChangedItem(baseItem, localItem, remoteItem)];
+    }
+
+    return localItem ? [localItem] : [];
+  });
+}
+
+function mergeRecordFields<T extends object>(base: T, local: T, remote: T): T {
+  const result = { ...remote } as T;
+
+  for (const key of Object.keys(local) as Array<keyof T>) {
+    if (!valuesEqual(local[key], base[key])) {
+      result[key] = local[key];
+    }
+  }
+
+  return result;
+}
+
+function mergeRecordValues<T>(
+  base: Record<string, T>,
+  local: Record<string, T>,
+  remote: Record<string, T>
+): Record<string, T> {
+  const result: Record<string, T> = {};
+  const keys = unique([...Object.keys(remote), ...Object.keys(local), ...Object.keys(base)]);
+
+  for (const key of keys) {
+    const localChanged = !valuesEqual(local[key], base[key]);
+    const value = localChanged ? local[key] : remote[key];
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+function getMarkerSlotKey(marker: Marker): string {
+  return [marker.competitionId, marker.participantId, marker.phase, marker.roleId].join(":");
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }

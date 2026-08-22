@@ -6,7 +6,11 @@ import { replaceParticipantMarkers } from "./merge";
 import { initialAppState } from "../data/seed";
 import { getVisibleMarkers } from "../selectors";
 import { appReducer } from "../state/appReducer";
-import { buildProjectSyncPayload, mergeProjectSyncPayload } from "../state/projectSync";
+import {
+  buildProjectSyncPayload,
+  mergeConcurrentProjectSyncPayload,
+  mergeProjectSyncPayload
+} from "../state/projectSync";
 import type { Competition, Marker, Project } from "../types";
 import { getGuideSteps, helpSections } from "../guide/guideContent";
 
@@ -370,6 +374,194 @@ describe("DB同期", () => {
     expect(merged.competitions.some((item) => item.id === "competition-local")).toBe(false);
     expect(merged.markers.some((item) => item.competitionId === "competition-local")).toBe(false);
     expect(merged.markers.some((item) => item.id === remoteMarker.id)).toBe(true);
+  });
+
+  it("別々の参加者が同時に丸を動かしても両方の変更を残す", () => {
+    const baseState = {
+      ...initialAppState,
+      markers: [
+        { ...marker("marker-a", "participant-1", 10), competitionId: initialAppState.activeCompetitionId },
+        { ...marker("marker-b", "participant-2", 20), competitionId: initialAppState.activeCompetitionId }
+      ]
+    };
+    const localState = appReducer(baseState, {
+      type: "moveMarker",
+      markerId: "marker-a",
+      xSnap: 30,
+      ySnap: 10
+    });
+    const remoteState = appReducer(baseState, {
+      type: "moveMarker",
+      markerId: "marker-b",
+      xSnap: 40,
+      ySnap: 10
+    });
+    const base = buildProjectSyncPayload(baseState)!;
+    const local = buildProjectSyncPayload(localState)!;
+    const remote = buildProjectSyncPayload(remoteState)!;
+
+    const merged = mergeConcurrentProjectSyncPayload(base, local, remote);
+
+    expect(merged.markers.find((item) => item.id === "marker-a")?.xSnap).toBe(30);
+    expect(merged.markers.find((item) => item.id === "marker-b")?.xSnap).toBe(40);
+  });
+
+  it("30人がそれぞれ自分の丸を同時編集しても全員分を統合する", () => {
+    const baseState = {
+      ...initialAppState,
+      markers: initialAppState.participants.map((participant, index) => ({
+        ...marker(`marker-${index + 1}`, participant.id, index),
+        competitionId: initialAppState.activeCompetitionId
+      }))
+    };
+    const base = buildProjectSyncPayload(baseState)!;
+    let server = base;
+
+    for (let index = 0; index < initialAppState.participants.length; index += 1) {
+      const localState = appReducer(baseState, {
+        type: "moveMarker",
+        markerId: `marker-${index + 1}`,
+        xSnap: index + 50,
+        ySnap: 10
+      });
+      server = mergeConcurrentProjectSyncPayload(
+        base,
+        buildProjectSyncPayload(localState)!,
+        server
+      );
+    }
+
+    expect(server.markers).toHaveLength(initialAppState.participants.length);
+    expect(server.markers.every((item) => item.xSnap >= 50)).toBe(true);
+  });
+
+  it("参加者名と別の丸を同時編集しても両方の変更を残す", () => {
+    const baseState = {
+      ...initialAppState,
+      markers: [
+        { ...marker("marker-a", "participant-1", 10), competitionId: initialAppState.activeCompetitionId }
+      ]
+    };
+    const localState = appReducer(baseState, {
+      type: "updateParticipantName",
+      participantId: "participant-1",
+      name: "1. 新しい名前"
+    });
+    const remoteState = appReducer(baseState, {
+      type: "moveMarker",
+      markerId: "marker-a",
+      xSnap: 45,
+      ySnap: 10
+    });
+
+    const merged = mergeConcurrentProjectSyncPayload(
+      buildProjectSyncPayload(baseState)!,
+      buildProjectSyncPayload(localState)!,
+      buildProjectSyncPayload(remoteState)!
+    );
+
+    expect(merged.participants.find((item) => item.id === "participant-1")?.name).toBe(
+      "1. 新しい名前"
+    );
+    expect(merged.markers.find((item) => item.id === "marker-a")?.xSnap).toBe(45);
+  });
+
+  it("同じ手具枠を同時に動かした場合は保存を再試行した側を採用する", () => {
+    const baseState = {
+      ...initialAppState,
+      markers: [
+        { ...marker("marker-a", "participant-1", 10), competitionId: initialAppState.activeCompetitionId }
+      ]
+    };
+    const localState = appReducer(baseState, {
+      type: "moveMarker",
+      markerId: "marker-a",
+      xSnap: 30,
+      ySnap: 10
+    });
+    const remoteState = appReducer(baseState, {
+      type: "moveMarker",
+      markerId: "marker-a",
+      xSnap: 50,
+      ySnap: 10
+    });
+
+    const merged = mergeConcurrentProjectSyncPayload(
+      buildProjectSyncPayload(baseState)!,
+      buildProjectSyncPayload(localState)!,
+      buildProjectSyncPayload(remoteState)!
+    );
+
+    expect(merged.markers).toHaveLength(1);
+    expect(merged.markers[0].xSnap).toBe(30);
+  });
+
+  it("同じ手具枠へ別IDの丸を同時配置しても重複させない", () => {
+    const baseState = {
+      ...initialAppState,
+      markers: [
+        { ...marker("old-marker", "participant-1", 10), competitionId: initialAppState.activeCompetitionId }
+      ]
+    };
+    const localState = appReducer(baseState, {
+      type: "placeMarker",
+      marker: {
+        ...marker("local-marker", "participant-1", 30),
+        competitionId: initialAppState.activeCompetitionId
+      }
+    });
+    const remoteState = appReducer(baseState, {
+      type: "placeMarker",
+      marker: {
+        ...marker("remote-marker", "participant-1", 50),
+        competitionId: initialAppState.activeCompetitionId
+      }
+    });
+
+    const merged = mergeConcurrentProjectSyncPayload(
+      buildProjectSyncPayload(baseState)!,
+      buildProjectSyncPayload(localState)!,
+      buildProjectSyncPayload(remoteState)!
+    );
+
+    expect(merged.markers).toHaveLength(1);
+    expect(merged.markers[0].id).toBe("local-marker");
+    expect(merged.markers[0].xSnap).toBe(30);
+  });
+
+  it("手具を削除した端末と別の手具を編集した端末の変更を統合する", () => {
+    const baseState = {
+      ...initialAppState,
+      markers: [
+        {
+          ...marker("delete-marker", "participant-1", 10),
+          competitionId: initialAppState.activeCompetitionId,
+          roleId: "role-m1"
+        },
+        {
+          ...marker("keep-marker", "participant-2", 20),
+          competitionId: initialAppState.activeCompetitionId,
+          roleId: "role-rifle"
+        }
+      ]
+    };
+    const localState = appReducer(baseState, { type: "deleteRoles", roleIds: ["role-m1"] });
+    const remoteState = appReducer(baseState, {
+      type: "moveMarker",
+      markerId: "keep-marker",
+      xSnap: 60,
+      ySnap: 10
+    });
+
+    const merged = mergeConcurrentProjectSyncPayload(
+      buildProjectSyncPayload(baseState)!,
+      buildProjectSyncPayload(localState)!,
+      buildProjectSyncPayload(remoteState)!
+    );
+
+    expect(merged.roles.some((role) => role.id === "role-m1")).toBe(false);
+    expect(merged.markers.some((item) => item.id === "delete-marker")).toBe(false);
+    expect(merged.markers.find((item) => item.id === "keep-marker")?.xSnap).toBe(60);
   });
 });
 
