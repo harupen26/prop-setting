@@ -299,6 +299,7 @@ export function useProjectRealtimeSync(
 
     const fingerprint = getProjectSyncFingerprint(payload);
     if (fingerprint === lastFingerprintRef.current) {
+      setSyncInfo(getSyncInfo("synced"));
       return undefined;
     }
 
